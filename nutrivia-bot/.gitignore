@@ -1,0 +1,10 @@
+.venv/
+.env
+data/*.db
+data/photos/
+exports/
+__pycache__/
+.pytest_cache/
+data/*.db-*
+data/pilot-photos/
+data/pilot-logs/

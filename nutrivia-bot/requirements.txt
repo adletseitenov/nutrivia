@@ -1,0 +1,10 @@
+aiogram==3.31.0
+anthropic==2.3.0
+aiosqlite==0.22.1
+rapidfuzz==3.14.6
+pytest==9.1.1
+pytest-asyncio==1.4.1
+fastapi==0.162.0
+uvicorn==0.54.0
+python-multipart==0.0.32
+httpx==0.28.1

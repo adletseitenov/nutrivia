@@ -1,0 +1,7 @@
+# Секреты и локальные данные — не в репозиторий
+.env
+*.db
+*.db-*
+.DS_Store
+.claude/
+nutrivia-build-plan.md
