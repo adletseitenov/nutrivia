@@ -36,8 +36,8 @@ async def main(phones: list[str]) -> None:
                 continue
             print(f"--- {phone} ---")
             print(f"""Привет! Это Nutrivia — фото еды → калории и разбор от нутрициолога.
-1. Поставь Expo Go из App Store / Google Play.
-2. Открой в нём «Enter URL manually» и вставь: {link}
+1. Открой ссылку в Safari или Chrome на телефоне: {link}
+2. Чтобы было как приложение: «Поделиться» → «На экран Домой».
 3. Введи свой номер и код входа: {code}
 Код одноразовый, действует 7 дней.
 """)

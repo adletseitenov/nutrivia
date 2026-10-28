@@ -1,13 +1,13 @@
 #!/usr/bin/env bash
-# Пилот с Мака: API + приложение для Expo Go, наружу через бесплатные туннели Cloudflare.
+# Пилот с Мака: API + веб-версия приложения на одном адресе, наружу через бесплатный туннель Cloudflare.
+# Участники открывают ссылку в браузере телефона: Expo Go на iPhone не пускает в проект чужого аккаунта.
 # Настройки и ключи — в nutrivia-bot/.env. Остановить — Ctrl+C (гасит всё).
-# Адреса туннелей новые при каждом запуске: после перезапуска разошлите участникам новую ссылку.
+# Адрес туннеля новый при каждом запуске: после перезапуска разошлите участникам новую ссылку.
 set -euo pipefail
 
 BOT_DIR="$(cd "$(dirname "$0")/.." && pwd)"
 APP_DIR="$BOT_DIR/../nutrivia-app"
 API_PORT=8001
-METRO_PORT=8082
 LOGS="$BOT_DIR/data/pilot-logs"
 mkdir -p "$LOGS"
 
@@ -26,33 +26,28 @@ tunnel() {  # $1 порт, $2 имя лога → печатает https-адр�
   echo "туннель $2 не поднялся, см. $LOGS/$2.log" >&2; exit 1
 }
 
+# Свежая веб-версия приложения; API раздаёт её с того же адреса
+(cd "$APP_DIR" && npx expo export -p web --output-dir dist >"$LOGS/web-build.log" 2>&1) \
+  || { echo "веб-версия не собралась, см. $LOGS/web-build.log"; exit 1; }
+
 # Мак не засыпает, пока пилот запущен
 caffeinate -ims -w $$ &
 
 cd "$BOT_DIR"
-PORT=$API_PORT .venv/bin/python -m nutrivia.api >"$LOGS/api.log" 2>&1 &
+WEB_DIR="$APP_DIR/dist" PORT=$API_PORT .venv/bin/python -m nutrivia.api >"$LOGS/api.log" 2>&1 &
 pids+=($!)
 for _ in $(seq 30); do curl -sf "http://localhost:$API_PORT/health" >/dev/null && break; sleep 1; done
 curl -sf "http://localhost:$API_PORT/health" >/dev/null || { echo "API не запустился, см. $LOGS/api.log"; exit 1; }
 
-API_URL=$(tunnel $API_PORT api-tunnel)
-METRO_URL=$(tunnel $METRO_PORT metro-tunnel)
-
-cd "$APP_DIR"
-EXPO_PUBLIC_API_URL="$API_URL" EXPO_PACKAGER_PROXY_URL="$METRO_URL" \
-  npx expo start --port $METRO_PORT --no-dev --minify >"$LOGS/metro.log" 2>&1 &
-pids+=($!)
-
-LINK="exps://${METRO_URL#https://}"
-echo "$LINK" >"$LOGS/link.txt"
-cat <<EOF
+URL=$(tunnel $API_PORT api-tunnel)
+echo "$URL" >"$LOGS/link.txt"
+cat <<MSG
 
 Пилот запущен.
-  API:        $API_URL
-  Приложение: $LINK
-  (в Expo Go: «Enter URL manually» → вставить ссылку)
-  Логи:       $LOGS  (коды из SMS при SMS_PROVIDER=console — в api.log)
+  Приложение: $URL   (открыть в Safari / Chrome на телефоне)
+  Логи:       $LOGS
+  Коды входа: .venv/bin/python -m scripts.pilot_code +7707…
 
 Мак не выключать и не усыплять. Остановить — Ctrl+C.
-EOF
+MSG
 wait

@@ -2,17 +2,27 @@
  * Клиент API (nutrivia-bot/nutrivia/api.py). Фото уходит на наш сервер — ключ AI там,
  * разбор делает claude-opus-5-5, нутриенты считает Engine сервера.
  *
- * Вход по номеру телефона и коду из SMS; токен сессии хранится в SecureStore
+ * Вход по номеру телефона и коду; токен сессии хранится в SecureStore (в браузере — в localStorage)
  * и уходит в заголовке Authorization: Bearer.
  */
 import { Asset } from 'expo-asset';
 import { File } from 'expo-file-system';
 import * as SecureStore from 'expo-secure-store';
+import { Platform } from 'react-native';
 
 import type { Goal } from '@/store/app-store';
 
-const BASE = process.env.EXPO_PUBLIC_API_URL ?? 'http://localhost:8000';
+const WEB = Platform.OS === 'web';
+// Веб-версию раздаёт тот же сервер, что и API, — в браузере хватает относительных адресов
+const BASE = WEB ? process.env.EXPO_PUBLIC_API_URL || '' : (process.env.EXPO_PUBLIC_API_URL ?? 'http://localhost:8000');
 const KEY = 'nutrivia.session';
+
+// Веб-версия для пилота: в браузере нет SecureStore
+const store = {
+  get: () => (WEB ? Promise.resolve(localStorage.getItem(KEY)) : SecureStore.getItemAsync(KEY)),
+  set: (v: string) => (WEB ? Promise.resolve(localStorage.setItem(KEY, v)) : SecureStore.setItemAsync(KEY, v)),
+  remove: () => (WEB ? Promise.resolve(localStorage.removeItem(KEY)) : SecureStore.deleteItemAsync(KEY)),
+};
 
 export type ServerItem = {
   dish_id: string | null;
@@ -111,6 +121,7 @@ export class ApiError extends Error {
 }
 
 let token: string | null = null;
+let loaded: Promise<void> | null = null;
 let onUnauthorized: (() => void) | null = null;
 
 /** Стор подписывается: сессия истекла или отозвана — вернуть на экран входа. */
@@ -118,14 +129,22 @@ export function setUnauthorizedHandler(fn: () => void) {
   onUnauthorized = fn;
 }
 
+/** Сохранённая сессия читается один раз; запросы ждут её, чтобы не уйти без токена. */
+function loadSession() {
+  loaded ??= store.get().then((t) => {
+    token = token ?? t;
+  });
+  return loaded;
+}
+
 export async function hasSession() {
-  token = token ?? (await SecureStore.getItemAsync(KEY));
+  await loadSession();
   return !!token;
 }
 
 async function clearSession() {
   token = null;
-  await SecureStore.deleteItemAsync(KEY);
+  await store.remove();
 }
 
 /** Фото приёма пищи с сервера по токену сессии: своё (meal) или ученика (pro). */
@@ -141,8 +160,10 @@ const STATUS_MESSAGES: Record<number, string> = {
 };
 
 async function request<T>(path: string, init: RequestInit = {}): Promise<T> {
+  await loadSession();
   const headers: Record<string, string> = { ...(init.headers as Record<string, string>) };
-  if (token) headers.Authorization = `Bearer ${token}`;
+  const sent = token;
+  if (sent) headers.Authorization = `Bearer ${sent}`;
   let res: Response;
   try {
     res = await fetch(`${BASE}${path}`, { ...init, headers });
@@ -150,7 +171,8 @@ async function request<T>(path: string, init: RequestInit = {}): Promise<T> {
     console.warn(`[api] ${path} network error`, e);
     throw new ApiError(0, 'Нет связи с сервером. Проверьте интернет и попробуйте ещё раз.');
   }
-  if (res.status === 401 && token) {
+  // Сбрасываем, только если отказали именно текущему токену (а не запросу, ушедшему до входа)
+  if (res.status === 401 && sent && sent === token) {
     await clearSession();
     onUnauthorized?.();
     throw new ApiError(401, 'Войдите заново.');
@@ -195,7 +217,7 @@ export async function smsVerify(phone: string, code: string, signup: SignupData)
     },
   );
   token = r.token;
-  await SecureStore.setItemAsync(KEY, r.token);
+  await store.set(r.token);
   return r;
 }
 
@@ -240,6 +262,12 @@ async function resolvePhoto(uri: string) {
 
 export async function uploadMeal(uri: string) {
   const form = new FormData();
+  if (WEB) {
+    // В браузере снимок — data: или blob: адрес; отдаём его байты как обычный файл
+    const blob = await (await fetch(uri === 'demo:plov' ? Asset.fromModule(require('@/assets/images/demo-plov.png')).uri : uri)).blob();
+    form.append('photo', blob, 'meal.jpg');
+    return request<ServerMeal>('/v1/meals', { method: 'POST', body: form });
+  }
   // fetch в Expo SDK 58 принимает только Blob-подобные части (File из expo-file-system), не { uri, name, type }.
   // Тип файла сервер определяет по байтам.
   form.append('photo', (await resolvePhoto(uri)) as unknown as Blob);

@@ -439,3 +439,21 @@ def test_manual_codes_only_for_invited(manual_client):
 
 def test_sms_start_reports_delivery(client):
     assert client.post("/v1/auth/sms/start", json={"phone": PHONE}).json()["delivery"] == "sms"
+
+
+def test_serves_web_app(tmp_path, monkeypatch):
+    web = tmp_path / "web"
+    (web / "_expo").mkdir(parents=True)
+    (web / "index.html").write_text("<html>app</html>")
+    (web / "_expo" / "app.js").write_text("js")
+    (tmp_path / "secret.txt").write_text("nope")
+    monkeypatch.setenv("WEB_DIR", str(web))
+    cfg = Config(solo_review_chat_id=-100, photos_dir=str(tmp_path / "p"), bot_token="")
+    with TestClient(create_app(cfg, vision=FakeVision(), db_path=":memory:", sms=ConsoleSms())) as c:
+        assert c.get("/").text == "<html>app</html>"
+        assert c.get("/today").text == "<html>app</html>"  # маршрут приложения
+        assert c.get("/_expo/app.js").text == "js"
+        assert c.get("/../secret.txt").text != "nope"
+        assert c.get("/health").json() == {"ok": True}  # API не перекрыт
+        assert c.get("/v1/me").status_code == 401
+        assert c.get("/v1/nope").status_code == 404

@@ -364,6 +364,21 @@ def create_app(cfg: Config | None = None, vision: VisionProvider | None = None, 
         return [{"id": d.id, "name": d.name_ru, "unit": d.unit, "unit_grams": d.unit_grams,
                  "kcal_100g": d.kcal} for d in hits]
 
+    # Веб-версия приложения (WEB_DIR = результат `expo export -p web`): тот же адрес, что и API
+    web_dir = os.environ.get("WEB_DIR")
+    if web_dir and Path(web_dir, "index.html").is_file():
+        root = Path(web_dir).resolve()
+
+        @app.get("/{path:path}", include_in_schema=False)
+        async def web_app(path: str):
+            if path.startswith("v1/"):
+                raise HTTPException(404)
+            f = (root / path).resolve()
+            if path and f.is_file() and f.is_relative_to(root):
+                return FileResponse(f)
+            # Маршруты приложения (/today, /meal…) — одна страница, роутер разберётся сам
+            return FileResponse(root / "index.html", headers={"Cache-Control": "no-cache"})
+
     return app
 
 

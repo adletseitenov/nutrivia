@@ -1,7 +1,7 @@
 import * as Haptics from 'expo-haptics';
 import { router, useLocalSearchParams } from 'expo-router';
 import { useEffect, useRef, useState, type ComponentRef } from 'react';
-import { Alert, Pressable, StyleSheet, TextInput, View } from 'react-native';
+import { Alert, Platform, Pressable, StyleSheet, TextInput, View } from 'react-native';
 
 import { ApiError, smsStart, smsVerify } from '@/api/client';
 import { RoundButton } from '@/components/round-button';
@@ -56,7 +56,10 @@ export default function Code() {
       refreshToday(dispatch);
       router.dismissAll();
       router.replace(r.me.pro ? '/pro' : '/today');
-      if (r.join_message) Alert.alert('Код не подошёл', r.join_message);
+      if (r.join_message) {
+        if (Platform.OS === 'web') window.alert(`Код не подошёл\n${r.join_message}`);
+        else Alert.alert('Код не подошёл', r.join_message);
+      }
     } catch (e) {
       Haptics.notificationAsync(Haptics.NotificationFeedbackType.Error);
       setError(e instanceof ApiError ? e.message : 'Не получилось проверить код. Попробуйте ещё раз.');
