@@ -58,6 +58,30 @@ SYSTEM_PROMPT = """Ты помогаешь нутрициологу в Каза�
 Ориентиры: пиала плова ≈300 г, тарелка бешбармака ≈350 г, одна манта ≈60 г, баурсак ≈25 г, четверть лепёшки ≈60 г, кесе ≈200–250 мл."""
 
 
+PRODUCTS_SCHEMA = {
+    "type": "object",
+    "properties": {
+        "products": {
+            "type": "array",
+            "items": {
+                "type": "object",
+                "properties": {"name": {"type": "string"}, "confidence": {"type": "number"}},
+                "required": ["name", "confidence"],
+                "additionalProperties": False,
+            },
+        },
+    },
+    "required": ["products"],
+    "additionalProperties": False,
+}
+
+PRODUCTS_PROMPT = """Ты помогаешь человеку решить, что приготовить. На фото — холодильник, полка или стол с продуктами.
+Перечисли продукты, которые видно: name — одно-два слова на русском в именительном падеже множественного
+или единственного числа, как в магазине (яйца, курица, гречка, творог, кефир, помидоры, огурцы, рис, картофель).
+confidence — уверенность от 0 до 1. Соусы, приправы и напитки, кроме кефира и молока, не перечисляй.
+Если продуктов не видно — пустой список. Рецепты не придумывай и калории не считай."""
+
+
 @dataclass
 class VisionDish:
     name: str
@@ -78,6 +102,23 @@ class VisionResult:
     latency_ms: int = 0
     error: str = ""
     raw: dict | None = None
+
+
+@dataclass
+class ProductsResult:
+    """Продукты на фото холодильника + метрики запроса (стоимость, задержка) для журнала ИИ."""
+    request: "VisionResult"
+    products: list[str]
+
+
+def parse_products(payload: dict) -> list[str]:
+    seen, out = set(), []
+    for p in payload.get("products", []):
+        name = str(p.get("name", "")).strip().lower()
+        if name and float(p.get("confidence") or 0) >= 0.4 and name not in seen:
+            seen.add(name)
+            out.append(name)
+    return out
 
 
 class VisionProvider(Protocol):
@@ -163,6 +204,37 @@ class ClaudeVision:
             result.status = "not_food"
         return result
 
+    async def analyze_products(self, image: bytes, media_type: str = "image/jpeg") -> ProductsResult:
+        """Продукты на фото холодильника — тем же вызовом, со своей схемой."""
+        started = time.monotonic()
+        try:
+            resp = await self.client.beta.messages.create(
+                model=self.model, max_tokens=1500, system=PRODUCTS_PROMPT,
+                betas=["server-side-fallback-2026-07-01"], fallbacks="default",
+                output_config={"effort": "low", "format": {"type": "json_schema", "schema": PRODUCTS_SCHEMA}},
+                messages=[{"role": "user", "content": [
+                    {"type": "image", "source": {"type": "base64", "media_type": media_type,
+                                                 "data": base64.standard_b64encode(image).decode("ascii")}},
+                    {"type": "text", "text": "Что есть из продуктов?"},
+                ]}],
+            )
+        except (anthropic.RateLimitError, anthropic.APIStatusError, anthropic.APIConnectionError) as e:
+            return ProductsResult(self._fail(started, f"{type(e).__name__}: {e}"), [])
+        result = VisionResult(
+            status="ok", model=resp.model, input_tokens=resp.usage.input_tokens, output_tokens=resp.usage.output_tokens,
+            cost_usd=(resp.usage.input_tokens * PRICE_IN + resp.usage.output_tokens * PRICE_OUT) / 1_000_000,
+            latency_ms=int((time.monotonic() - started) * 1000))
+        if resp.stop_reason in ("refusal", "max_tokens"):
+            result.status = "refusal" if resp.stop_reason == "refusal" else "error"
+            return ProductsResult(result, [])
+        try:
+            payload = json.loads(next((b.text for b in resp.content if b.type == "text"), ""))
+        except json.JSONDecodeError:
+            result.status, result.error = "error", "bad_json"
+            return ProductsResult(result, [])
+        result.raw = payload
+        return ProductsResult(result, parse_products(payload))
+
     def _fail(self, started: float, error: str) -> VisionResult:
         log.warning("vision failed: %s", error)
         return VisionResult(status="error", model=self.model, error=error,
@@ -176,44 +248,62 @@ class OpenRouterVision:
     """Тот же промпт и схема через OpenRouter: одна оплата, любая модель с картинками.
     Стоимость берём из usage.cost — OpenRouter считает её сам по цене выбранной модели."""
 
-    def __init__(self, model: str, api_key: str, client: httpx.AsyncClient | None = None, timeout: float = 60):
-        self.model, self.api_key = model, api_key
+    def __init__(self, model: str, api_key: str, client: httpx.AsyncClient | None = None, timeout: float = 60,
+                 fallback_model: str = ""):
+        self.model, self.api_key, self.fallback_model = model, api_key, fallback_model
         self.client = client or httpx.AsyncClient(timeout=timeout)
 
     async def analyze(self, image: bytes, media_type: str = "image/jpeg") -> VisionResult:
+        result, payload = await self._ask(SYSTEM_PROMPT, "Разбери фото.", image, media_type, "dishes", DISHES_SCHEMA)
+        if payload is None:
+            return result
+        result.dishes = parse_payload(payload)
+        if not payload.get("is_food") or not result.dishes:
+            result.status = "not_food"
+        return result
+
+    async def analyze_products(self, image: bytes, media_type: str = "image/jpeg") -> ProductsResult:
+        result, payload = await self._ask(PRODUCTS_PROMPT, "Что есть из продуктов?", image, media_type,
+                                          "products", PRODUCTS_SCHEMA)
+        return ProductsResult(result, parse_products(payload) if payload else [])
+
+    async def _ask(self, system: str, text: str, image: bytes, media_type: str, name: str,
+                   schema: dict) -> tuple[VisionResult, dict | None]:
+        """Один запрос со схемой ответа. Возвращает результат с метриками и разобранный JSON (или None при ошибке)."""
         started = time.monotonic()
         data_url = f"data:{media_type};base64,{base64.standard_b64encode(image).decode('ascii')}"
         body = {
             "model": self.model,
             "max_tokens": 1500,  # ответ — короткий JSON (~150 токенов); OpenRouter резервирует оплату под лимит
             "messages": [
-                {"role": "system", "content": SYSTEM_PROMPT},
+                {"role": "system", "content": system},
                 {"role": "user", "content": [
                     {"type": "image_url", "image_url": {"url": data_url}},
-                    {"type": "text", "text": "Разбери фото."},
+                    {"type": "text", "text": text},
                 ]},
             ],
-            "response_format": {"type": "json_schema",
-                                "json_schema": {"name": "dishes", "strict": True, "schema": DISHES_SCHEMA}},
+            "response_format": {"type": "json_schema", "json_schema": {"name": name, "strict": True, "schema": schema}},
             # Только провайдеры, которые держат схему ответа; без неё разбор не парсится
             "provider": {"require_parameters": True},
             "usage": {"include": True},
         }
+        if self.fallback_model:
+            body["models"] = [self.model, self.fallback_model]  # основная модель недоступна — OpenRouter берёт запасную
         try:
             resp = await self.client.post(OPENROUTER_URL, json=body, headers={
                 "Authorization": f"Bearer {self.api_key}",
                 "X-Title": "Nutrivia",
             })
         except httpx.HTTPError as e:
-            return self._fail(started, f"connection: {e}")
+            return self._fail(started, f"connection: {e}"), None
         if resp.status_code == 429:
-            return self._fail(started, f"rate_limit: {resp.text[:200]}")
+            return self._fail(started, f"rate_limit: {resp.text[:200]}"), None
         if resp.status_code >= 400:
-            return self._fail(started, f"api_status {resp.status_code}: {resp.text[:200]}")
+            return self._fail(started, f"api_status {resp.status_code}: {resp.text[:200]}"), None
 
         out = resp.json()
         if "error" in out:
-            return self._fail(started, f"api_error: {str(out['error'])[:200]}")
+            return self._fail(started, f"api_error: {str(out['error'])[:200]}"), None
         usage = out.get("usage") or {}
         choice = (out.get("choices") or [{}])[0]
         result = VisionResult(
@@ -227,22 +317,17 @@ class OpenRouterVision:
         finish = choice.get("finish_reason")
         if finish == "content_filter":
             result.status = "refusal"
-            return result
+            return result, None
         if finish == "length":
             result.status, result.error = "error", "max_tokens"
-            return result
-
-        text = (choice.get("message") or {}).get("content") or ""
+            return result, None
         try:
-            payload = json.loads(text)
+            payload = json.loads((choice.get("message") or {}).get("content") or "")
         except json.JSONDecodeError:
             result.status, result.error = "error", "bad_json"
-            return result
+            return result, None
         result.raw = payload
-        result.dishes = parse_payload(payload)
-        if not payload.get("is_food") or not result.dishes:
-            result.status = "not_food"
-        return result
+        return result, payload
 
     def _fail(self, started: float, error: str) -> VisionResult:
         log.warning("vision failed: %s", error)
@@ -250,14 +335,14 @@ class OpenRouterVision:
                             latency_ms=int((time.monotonic() - started) * 1000))
 
 
-def make_vision(provider: str, model: str = "", openrouter_key: str = "") -> VisionProvider:
-    """VISION_PROVIDER: claude | openrouter | fake."""
+def make_vision(provider: str, model: str = "", openrouter_key: str = "", fallback_model: str = "") -> VisionProvider:
+    """VISION_PROVIDER: claude | openrouter | fake. VISION_FALLBACK_MODEL — запасная модель OpenRouter."""
     if provider == "fake":
         return FakeVision()
     if provider == "openrouter":
         if not openrouter_key:
             raise RuntimeError("VISION_PROVIDER=openrouter, но нет OPENROUTER_API_KEY")
-        return OpenRouterVision(model or "anthropic/claude-sonnet-5.5", openrouter_key)
+        return OpenRouterVision(model or "anthropic/claude-sonnet-5.5", openrouter_key, fallback_model=fallback_model)
     return ClaudeVision(model or "claude-opus-5-5")
 
 
@@ -274,3 +359,9 @@ class FakeVision:
         dishes = parse_payload(self.payload)
         status = "ok" if self.payload.get("is_food") and dishes else "not_food"
         return VisionResult(status=status, dishes=dishes, model="fake", raw=self.payload)
+
+    FRIDGE = {"products": [{"name": n, "confidence": 0.9} for n in
+                           ("яйца", "курица", "гречка", "творог", "кефир", "помидоры", "огурцы")]}
+
+    async def analyze_products(self, image: bytes, media_type: str = "image/jpeg") -> ProductsResult:
+        return ProductsResult(VisionResult(status="ok", model="fake", raw=self.FRIDGE), parse_products(self.FRIDGE))

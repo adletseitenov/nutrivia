@@ -399,7 +399,7 @@ async def main() -> None:
         raise SystemExit("BOT_TOKEN не задан (.env)")
     db = Database(cfg.db_path)
     await db.connect()
-    vision = make_vision(cfg.vision_provider, cfg.vision_model, cfg.openrouter_api_key)
+    vision = make_vision(cfg.vision_provider, cfg.vision_model, cfg.openrouter_api_key, cfg.vision_fallback_model)
     svc = Service(db, DishBase.from_csv(cfg.dishes_csv), vision, cfg)
     bot = Bot(cfg.bot_token)
     dp = Dispatcher()

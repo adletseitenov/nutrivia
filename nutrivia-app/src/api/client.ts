@@ -303,6 +303,30 @@ async function resolvePhoto(uri: string) {
   return new File(uri);
 }
 
+export type FridgeIdea = {
+  title: string;
+  minutes: number;
+  items: { dish_id: string; name: string; grams: number; kcal: number; protein: number }[];
+  kcal: number;
+  protein: number;
+  fits: boolean;
+  /** порция уменьшена под остаток дня */
+  smaller: boolean;
+};
+export type FridgeResult = { status: 'ok' | 'empty'; products: string[]; ideas: FridgeIdea[]; remaining_kcal: number };
+
+/** Фото холодильника → продукты и блюда из базы под остаток дня. Фото на сервере не хранится. */
+export async function uploadFridge(uri: string) {
+  const form = new FormData();
+  if (WEB) form.append('photo', await (await fetch(uri)).blob(), 'fridge.jpg');
+  else form.append('photo', (await resolvePhoto(uri)) as unknown as Blob);
+  return request<FridgeResult>('/v1/fridge', { method: 'POST', body: form });
+}
+
+/** Пересчитать блюда по списку продуктов без ИИ (убрали лишнее, дописали своё). */
+export const fridgeIdeas = (products: string[]) =>
+  request<FridgeResult>('/v1/fridge/ideas', { method: 'POST', ...json({ products }) });
+
 export async function uploadMeal(uri: string) {
   const form = new FormData();
   if (WEB) {

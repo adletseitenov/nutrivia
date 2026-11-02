@@ -1,5 +1,6 @@
 """Логика бота без Telegram: регистрация, фото → черновик, проверка, ответ, совет, итоги, оффер.
 Telegram-слой (bot.py) только переводит сообщения и кнопки в вызовы этих методов."""
+import hashlib
 import json
 import secrets
 from collections import Counter
@@ -14,7 +15,7 @@ from .drafts import apply_edits, build_items, format_client, format_review, make
 from .engine import DishBase
 from .matcher import Matcher, parse_edits
 from .texts import GOALS, HEALTH_WORDS, HOME_PRODUCTS
-from .vision import VisionProvider
+from .vision import VisionProvider, VisionResult, parse_payload
 
 
 @dataclass
@@ -88,12 +89,13 @@ class Service:
         night = not (self.cfg.work_start_hour <= hour < self.cfg.work_end_hour)
         await self.db.log_event("photo_received", tg_id, meal_id=meal_id, night=night)
 
-        result = await self.vision.analyze(image, media_type)
-        await self.db.execute(
+        result = await self._recognize(tg_id, meal_id, image, media_type, ts)
+        if result.model not in ("cache", "budget"):
+            await self.db.execute(
             "INSERT INTO ai_requests (ts, user_id, meal_id, model, status, input_tokens, output_tokens, cost_usd,"
             " latency_ms, error) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
-            (self.db.clock(), tg_id, meal_id, result.model, result.status, result.input_tokens, result.output_tokens,
-             result.cost_usd, result.latency_ms, result.error or None))
+                (self.db.clock(), tg_id, meal_id, result.model, result.status, result.input_tokens,
+                 result.output_tokens, result.cost_usd, result.latency_ms, result.error or None))
 
         if result.status == "not_food":
             await self.db.execute("UPDATE meals SET status = 'failed', ai_draft = ? WHERE id = ?",
@@ -115,6 +117,65 @@ class Service:
         if result.status != "ok":
             text = f"⚠️ Модель не дала разбор ({result.status}). Заполните ответом «плов 300».\n\n" + text
         return PhotoOutcome("draft", meal_id, night, await self.review_chat_for(user), text)
+
+    async def ai_spent_today(self) -> float:
+        start, end = local_day_bounds(self.db.clock())
+        row = await self.db.fetchone("SELECT COALESCE(SUM(cost_usd), 0) AS c FROM ai_requests WHERE ts >= ? AND ts < ?",
+                                     (start, end))
+        return row["c"]
+
+    async def ai_over_budget(self) -> bool:
+        return bool(self.cfg.ai_daily_usd) and await self.ai_spent_today() >= self.cfg.ai_daily_usd
+
+    async def _recognize(self, tg_id: int, meal_id: int, image: bytes, media_type: str, ts: int) -> VisionResult:
+        """Фото → разбор. То же фото за сутки — берём прошлый разбор без оплаты (model=cache).
+        Дневной потолок трат исчерпан — модель не зовём, черновик пустой, его заполнит человек (model=budget)."""
+        digest = hashlib.sha256(image).hexdigest()
+        await self.db.execute("UPDATE meals SET photo_hash = ? WHERE id = ?", (digest, meal_id))
+        prev = await self.db.fetchone(
+            "SELECT ai_draft FROM meals WHERE user_id = ? AND photo_hash = ? AND id != ? AND received_at >= ?"
+            " AND ai_draft IS NOT NULL ORDER BY id DESC LIMIT 1", (tg_id, digest, meal_id, ts - 86400))
+        if prev:
+            payload = json.loads(prev["ai_draft"])
+            dishes = parse_payload(payload)
+            await self.db.log_event("vision_cache_hit", tg_id, meal_id=meal_id)
+            return VisionResult(status="ok" if payload.get("is_food") and dishes else "not_food",
+                                dishes=dishes, model="cache", raw=payload)
+        if await self.ai_over_budget():
+            await self.db.log_event("ai_budget_hit", tg_id, meal_id=meal_id)
+            return VisionResult(status="error", model="budget", error="daily budget")
+        return await self.vision.analyze(image, media_type)
+
+    async def fridge(self, user_id: int, image: bytes, media_type: str) -> dict:
+        """Фото холодильника → продукты → блюда из базы под остаток калорий. Status: ok | empty | budget | error."""
+        from .advice import targets_for
+        from .fridge import ideas_for
+        if await self.ai_over_budget():
+            return {"status": "budget", "products": [], "ideas": []}
+        res = await self.vision.analyze_products(image, media_type)
+        r = res.request
+        if r.model != "fake":
+            await self.db.execute(
+                "INSERT INTO ai_requests (ts, user_id, meal_id, model, status, input_tokens, output_tokens, cost_usd,"
+                " latency_ms, error) VALUES (?, ?, NULL, ?, ?, ?, ?, ?, ?, ?)",
+                (self.db.clock(), user_id, r.model, f"fridge_{r.status}", r.input_tokens, r.output_tokens,
+                 r.cost_usd, r.latency_ms, r.error or None))
+        if r.status != "ok":
+            return {"status": "error", "products": [], "ideas": []}
+        return await self.fridge_ideas(user_id, res.products)
+
+    async def fridge_ideas(self, user_id: int, products: list[str]) -> dict:
+        """Блюда под список продуктов без ИИ: человек убрал лишнее или дописал своё."""
+        from .advice import targets_for
+        from .fridge import ideas_for
+        today = await self.today_view(user_id)
+        user = await self.db.get_user(user_id)
+        kcal_target, protein_target = targets_for(user)
+        remaining = kcal_target - today["totals"]["kcal"]
+        ideas = ideas_for(products, self.base, remaining, today["totals"]["protein"] < protein_target * 0.7)
+        await self.db.log_event("fridge", user_id, products=len(products), ideas=len(ideas))
+        return {"status": "ok" if products else "empty", "products": products, "ideas": ideas,
+                "remaining_kcal": round(remaining)}
 
     async def review_text(self, meal_id: int) -> str:
         meal = await self.db.fetchone("SELECT * FROM meals WHERE id = ?", (meal_id,))

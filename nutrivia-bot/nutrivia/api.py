@@ -91,7 +91,7 @@ def create_app(cfg: Config | None = None, vision: VisionProvider | None = None, 
     async def lifespan(app: FastAPI):
         db = Database(db_path or cfg.db_path)
         await db.connect()
-        v = vision or make_vision(cfg.vision_provider, cfg.vision_model, cfg.openrouter_api_key)
+        v = vision or make_vision(cfg.vision_provider, cfg.vision_model, cfg.openrouter_api_key, cfg.vision_fallback_model)
         svc = Service(db, DishBase.from_csv(cfg.dishes_csv), v, cfg)
         secret = os.environ.get("AUTH_SECRET")
         if not secret:
@@ -358,6 +358,29 @@ def create_app(cfg: Config | None = None, vision: VisionProvider | None = None, 
         background.add_task(app.state.notifier.review_card, out.review_chat_id, out.meal_id, data, out.review_text)
         view = await svc.meal_view(out.meal_id, user["tg_id"])
         return {**view, "night": out.night}
+
+    @app.post("/v1/fridge")
+    async def fridge(svc: Svc, user: User, photo: UploadFile = File(...)):
+        """Фото холодильника → продукты и блюда из базы под остаток калорий дня. Фото не храним."""
+        data = await photo.read(MAX_PHOTO_BYTES + 1)
+        if len(data) > MAX_PHOTO_BYTES:
+            raise HTTPException(413, "photo too large")
+        media_type = sniff_image(data)
+        if media_type is None:
+            raise HTTPException(415, "jpeg, png or webp only")
+        out = await svc.fridge(user["tg_id"], data, media_type)
+        if out["status"] == "budget":
+            raise AuthError("budget", "Разбор фото на сегодня приостановлен. Попробуйте завтра.", 429)
+        if out["status"] == "error":
+            raise AuthError("vision_error", "Не получилось разобрать фото. Попробуйте ещё раз.", 502)
+        return out
+
+    class ProductsIn(BaseModel):
+        products: list[Annotated[str, Field(max_length=40)]] = Field(max_length=40)
+
+    @app.post("/v1/fridge/ideas")
+    async def fridge_ideas(body: ProductsIn, svc: Svc, user: User):
+        return await svc.fridge_ideas(user["tg_id"], [p.strip().lower() for p in body.products if p.strip()])
 
     @app.get("/v1/meals/{meal_id}")
     async def get_meal(meal_id: int, svc: Svc, user: User):

@@ -140,6 +140,8 @@ class Database:
             await self.conn.execute("ALTER TABLE users ADD COLUMN channel TEXT NOT NULL DEFAULT 'telegram'")
         if "role" not in cols:  # client | trainer | nutritionist
             await self.conn.execute("ALTER TABLE users ADD COLUMN role TEXT NOT NULL DEFAULT 'client'")
+        if "photo_hash" not in {r[1] for r in await (await self.conn.execute("PRAGMA table_info(meals)")).fetchall()}:
+            await self.conn.execute("ALTER TABLE meals ADD COLUMN photo_hash TEXT")  # то же фото второй раз не оплачиваем
         # Параметры для личной нормы калорий (приложение)
         for col, kind in (("sex", "TEXT"), ("birth_year", "INTEGER"), ("height_cm", "REAL"),
                           ("weight_kg", "REAL"), ("activity", "TEXT")):

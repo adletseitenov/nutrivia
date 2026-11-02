@@ -105,3 +105,27 @@ def test_make_vision():
     assert isinstance(make_vision("openrouter", "google/gemini-3.8-flash", "k"), OpenRouterVision)
     with pytest.raises(RuntimeError):
         make_vision("openrouter", "", "")
+
+
+async def test_openrouter_fallback_model_and_products():
+    import httpx
+    from nutrivia.vision import OpenRouterVision
+    seen = {}
+
+    def handler(request):
+        seen["body"] = json.loads(request.content)
+        return openrouter_reply(json.dumps({"products": [
+            {"name": "Яйца", "confidence": 0.9}, {"name": "кетчуп", "confidence": 0.2}, {"name": "яйца", "confidence": 0.8}]}))
+
+    v = OpenRouterVision("anthropic/claude-sonnet-5.5", "k", client=httpx.AsyncClient(transport=httpx.MockTransport(handler)),
+                         fallback_model="google/gemini-3.8-flash")
+    r = await v.analyze_products(b"jpeg")
+    assert r.products == ["яйца"]  # низкая уверенность и повтор отброшены
+    assert seen["body"]["models"] == ["anthropic/claude-sonnet-5.5", "google/gemini-3.8-flash"]
+    assert seen["body"]["response_format"]["json_schema"]["name"] == "products"
+
+
+def test_fridge_product_keys():
+    from nutrivia.fridge import product_keys
+    assert product_keys(["яйцо", "куриное филе", "гречневая крупа", "помидоры черри"]) == {"egg", "chicken", "buckwheat", "tomato"}
+    assert product_keys(["кетчуп"]) == set()

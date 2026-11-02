@@ -58,3 +58,20 @@ test('фото → черновик → оператор проверяет → 
   await client.reload();
   await expect(client.getByText('Проверено нутрициологом').filter({ visible: true }).first()).toBeVisible({ timeout: 20_000 });
 });
+
+test('холодильник: продукты → блюда под остаток дня → «Съел» записывает в день', async ({ page }) => {
+  await signupClient(page, '+77005550104');
+  await screen(page, 'Сегодня');
+  await page.getByLabel('Сфотографировать еду').filter({ visible: true }).click();
+  await screen(page, 'Сфотографируйте еду');
+  await page.getByText('Холодильник', { exact: true }).filter({ visible: true }).click();
+  const chooser = page.waitForEvent('filechooser');
+  await page.getByLabel('Выбрать из галереи').filter({ visible: true }).click();
+  await (await chooser).setFiles(PLOV);
+  await expect(page.getByText('Куриная грудка с гречкой').filter({ visible: true }).first()).toBeVisible({ timeout: 20_000 });
+  // убрали курицу — блюда с ней пропали
+  await page.getByLabel('Убрать: курица').filter({ visible: true }).click();
+  await expect(page.getByText('Куриная грудка с гречкой').filter({ visible: true })).toHaveCount(0);
+  await page.getByText('Съел', { exact: true }).filter({ visible: true }).first().click();
+  await expect(page.getByText('Записано', { exact: true }).filter({ visible: true }).first()).toBeVisible();
+});

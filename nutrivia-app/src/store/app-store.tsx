@@ -55,7 +55,8 @@ export function mealFromServer(m: ServerMeal): Meal {
     time: `${String(d.getHours()).padStart(2, '0')}:${String(d.getMinutes()).padStart(2, '0')}`,
     photo: m.has_photo ? `server:${m.id}` : null,
     items: itemsFromServer(m.items),
-    status: m.status === 'reviewed' ? 'reviewed' : m.status === 'manual' ? 'manual' : 'draft',
+    // Блюдо не из базы — клиенту видно «Уточните блюдо», пока разбор не проверен
+    status: m.status === 'reviewed' ? 'reviewed' : m.status === 'manual' ? 'manual' : m.items.some((i) => !i.in_base) ? 'needs-info' : 'draft',
     reviewerRole: m.reviewer?.role ?? null,
   };
 }

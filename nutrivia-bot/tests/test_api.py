@@ -623,3 +623,43 @@ def test_admin_requires_token_and_works(client, monkeypatch):
     assert "operator" in client.get("/v1/admin/overview", headers=A).json()["roles"]
     assert client.get("/v1/admin/users.csv", headers=A).text.startswith("user_id,role,phone")
     assert client.get("/admin").status_code == 200
+
+
+def test_fridge_ideas_fit_remaining_kcal(client):
+    h = register(client)
+    r = client.post("/v1/fridge", headers=h, files={"photo": ("f.jpg", JPEG, "image/jpeg")})
+    assert r.status_code == 200, r.text
+    out = r.json()
+    assert "курица" in out["products"] and out["ideas"]
+    titles = [i["title"] for i in out["ideas"]]
+    assert "Куриная грудка с гречкой" in titles and "Творог с кефиром" in titles
+    assert all(i["kcal"] == sum(x["kcal"] for x in i["items"]) for i in out["ideas"])
+    # почти весь день съеден — порции уменьшаются, но не меньше половины
+    client.post("/v1/meals/manual", headers=h, json={"items": [{"dish_id": "plov", "grams": 700}]})
+    small = client.post("/v1/fridge", headers=h, files={"photo": ("f.jpg", JPEG, "image/jpeg")}).json()
+    assert small["remaining_kcal"] < out["remaining_kcal"] and any(i["smaller"] for i in small["ideas"])
+    # убрал курицу, дописал рыбу и картошку — без ИИ
+    edited = client.post("/v1/fridge/ideas", headers=h, json={"products": ["рыба", "картофель", "творог", "кефир"]}).json()
+    assert {i["title"] for i in edited["ideas"]} == {"Рыба с картофелем", "Творог с кефиром"}
+
+
+def test_same_photo_twice_is_not_paid_again(client):
+    h = register(client)
+    upload(client, h)
+    upload(client, h)
+    db = client.app.state.svc.db
+    calls = client.portal.call(db.fetchone, "SELECT COUNT(*) AS n FROM ai_requests")
+    hits = client.portal.call(db.fetchone, "SELECT COUNT(*) AS n FROM events WHERE name = 'vision_cache_hit'")
+    assert calls["n"] == 1 and hits["n"] == 1
+
+
+def test_daily_ai_budget(client):
+    h = register(client)
+    svc = client.app.state.svc
+    svc.cfg.ai_daily_usd = 0.01
+    client.portal.call(svc.db.execute, "INSERT INTO ai_requests (ts, model, status, cost_usd) VALUES (?, 'x', 'ok', 0.02)",
+                       (int(time.time()),))
+    m = upload(client, h).json()
+    assert m["status"] == "draft" and m["items"] == []  # модель не звали — черновик заполнит человек
+    assert client.post("/v1/fridge", headers=h, files={"photo": ("f.jpg", JPEG, "image/jpeg")}).json()["code"] == "budget"
+    svc.cfg.ai_daily_usd = 0
