@@ -16,6 +16,7 @@ import { compute, fmt, getDish, portionCount, portionText } from '@/engine/engin
 import { GOALS, itemsFromServer, mealNutrients, useAppStore, type MealItem } from '@/store/app-store';
 import { font, radius, space } from '@/theme/tokens';
 import { useColors } from '@/theme/use-colors';
+import { t } from '@/lib/i18n';
 
 /** Быстрые фразы для комментария. Без «дефицит» и «диагноз» — как во всех текстах Nutrivia. */
 const QUICK = ['Хороший выбор!', 'Добавьте белок на ужин', 'Больше овощей к основному блюду', 'Порцию можно чуть меньше'];
@@ -116,7 +117,7 @@ export default function ProReview() {
     return (
       <View style={[styles.center, { backgroundColor: c.bg, paddingTop: insets.top + space[3] }]}>
         {error ? <Txt tone="warning" center>{error}</Txt> : <ActivityIndicator color={c.ink} />}
-        <Button title="Назад" variant="secondary" onPress={() => router.back()} />
+        <Button title={t('Назад')} variant="secondary" onPress={() => router.back()} />
       </View>
     );
   }
@@ -127,7 +128,7 @@ export default function ProReview() {
         <View>
           <MealPhoto uri={meal.has_photo ? `pro:${meal.id}` : null} width={width} height={300} />
           <View style={[styles.photoBar, { top: insets.top + space[2] }]}>
-            <RoundButton icon="back" label="Назад" onPress={() => router.back()} />
+            <RoundButton icon="back" label={t('Назад')} onPress={() => router.back()} />
             <StatusPill status={meal.status === 'reviewed' ? 'reviewed' : 'draft'} label={meal.status === 'reviewed' ? 'Отправлено' : 'Ждёт проверки'} />
           </View>
         </View>
@@ -157,8 +158,8 @@ export default function ProReview() {
                       <Txt variant="headline">{it.name}</Txt>
                       <Txt variant="caption" tone="warning">Нет в базе · ≈{fmt(it.grams)} г — замените блюдом из базы</Txt>
                     </View>
-                    <Button title="Заменить" size="s" variant="secondary" style={{ backgroundColor: c.bg }} onPress={() => setPicking(i)} />
-                    <Pressable accessibilityRole="button" accessibilityLabel="Убрать блюдо" onPress={() => change(items.filter((_, j) => j !== i))} style={styles.remove}>
+                    <Button title={t('Заменить')} size="s" variant="secondary" style={{ backgroundColor: c.bg }} onPress={() => setPicking(i)} />
+                    <Pressable accessibilityRole="button" accessibilityLabel={t('Убрать блюдо')} onPress={() => change(items.filter((_, j) => j !== i))} style={styles.remove}>
                       <Icon name="close" size={18} color={c.muted} />
                     </Pressable>
                   </View>
@@ -174,17 +175,17 @@ export default function ProReview() {
                     </Txt>
                   </View>
                   <View style={[styles.stepper, { backgroundColor: c.bg }]}>
-                    <Pressable accessibilityRole="button" accessibilityLabel="Меньше" onPress={() => step(i, -1)} style={styles.stepBtn}>
+                    <Pressable accessibilityRole="button" accessibilityLabel={t('Меньше')} onPress={() => step(i, -1)} style={styles.stepBtn}>
                       <Icon name="minus" size={18} color={c.ink} strokeWidth={2} />
                     </Pressable>
                     <Txt style={{ fontFamily: font.bold, fontSize: 15, minWidth: 28, textAlign: 'center' }}>
                       {portionCount(it.grams / (dish.unitGrams || 100))}
                     </Txt>
-                    <Pressable accessibilityRole="button" accessibilityLabel="Больше" onPress={() => step(i, 1)} style={styles.stepBtn}>
+                    <Pressable accessibilityRole="button" accessibilityLabel={t('Больше')} onPress={() => step(i, 1)} style={styles.stepBtn}>
                       <Icon name="plus" size={18} color={c.ink} strokeWidth={2} />
                     </Pressable>
                   </View>
-                  <Pressable accessibilityRole="button" accessibilityLabel="Убрать блюдо" onPress={() => change(items.filter((_, j) => j !== i))} style={styles.remove}>
+                  <Pressable accessibilityRole="button" accessibilityLabel={t('Убрать блюдо')} onPress={() => change(items.filter((_, j) => j !== i))} style={styles.remove}>
                     <Icon name="close" size={18} color={c.muted} />
                   </Pressable>
                 </View>
@@ -192,7 +193,7 @@ export default function ProReview() {
             })}
             <Pressable accessibilityRole="button" onPress={() => setPicking(null)} style={styles.add}>
               <Icon name="plus" size={18} color={c.accentText} strokeWidth={2} />
-              <Txt style={{ fontFamily: font.semibold, fontSize: 15, color: c.accentText }}>Добавить блюдо</Txt>
+              <Txt style={{ fontFamily: font.semibold, fontSize: 15, color: c.accentText }}>{t('Добавить блюдо')}</Txt>
             </Pressable>
           </View>
 
@@ -212,7 +213,7 @@ export default function ProReview() {
             <TextInput
               value={comment}
               onChangeText={setComment}
-              placeholder="Необязательно. Ученик увидит его в разборе и в итоге недели."
+              placeholder={t('Необязательно. Ученик увидит его в разборе и в итоге недели.')}
               placeholderTextColor={c.muted}
               multiline
               maxLength={1000}
@@ -229,7 +230,7 @@ export default function ProReview() {
             disabled={busy || meal.status === 'reviewed' || hasUnmatched || items.length === 0}
             onPress={send}
           />
-          {hasUnmatched && <Txt variant="caption" tone="muted" center>Сначала замените или уберите блюдо не из базы.</Txt>}
+          {hasUnmatched && <Txt variant="caption" tone="muted" center>{t('Сначала замените или уберите блюдо не из базы.')}</Txt>}
         </View>
       </ScrollView>
 

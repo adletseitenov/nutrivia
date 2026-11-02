@@ -2,6 +2,7 @@ import { Image, type ImageSource } from 'expo-image';
 import { StyleSheet, View } from 'react-native';
 
 import { useColors } from '@/theme/use-colors';
+import { t } from '@/lib/i18n';
 
 import { Txt } from './txt';
 
@@ -18,7 +19,7 @@ export function MascotSlot({ stage, size = 120 }: { stage?: number; size?: numbe
   if (src) return <Image source={src} style={{ width: size, height: size }} contentFit="contain" accessibilityLabel={`Маскот, стадия ${stage}`} />;
   return (
     <View
-      accessibilityLabel="Место для маскота"
+      accessibilityLabel={t('Место для маскота')}
       style={[styles.empty, { width: size, height: size, borderRadius: size / 2, backgroundColor: c.accentTint, borderColor: c.accent }]}>
       <Txt variant="caption" tone="accent" center>{stage ? `Голубика\nстадия ${stage}` : 'Голубика'}</Txt>
     </View>

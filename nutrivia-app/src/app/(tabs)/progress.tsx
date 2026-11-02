@@ -11,6 +11,7 @@ import { rangeLabel, WEEKDAYS_SHORT } from '@/lib/dates';
 import { refreshToday, useAppStore } from '@/store/app-store';
 import { font, radius, space } from '@/theme/tokens';
 import { useColors } from '@/theme/use-colors';
+import { t } from '@/lib/i18n';
 
 const CHART_H = 160;
 
@@ -31,7 +32,7 @@ export default function Progress() {
   if (!week) {
     return (
       <Screen tabs>
-        <Txt variant="title" style={{ fontFamily: font.extrabold, fontSize: 28, lineHeight: 34 }}>Прогресс</Txt>
+        <Txt variant="title" style={{ fontFamily: font.extrabold, fontSize: 28, lineHeight: 34 }}>{t('Прогресс')}</Txt>
         <ActivityIndicator color={c.ink} style={{ marginTop: space[6] }} />
       </Screen>
     );
@@ -46,7 +47,7 @@ export default function Progress() {
 
   return (
     <Screen tabs>
-      <Txt variant="title" style={{ fontFamily: font.extrabold, fontSize: 28, lineHeight: 34 }}>Прогресс</Txt>
+      <Txt variant="title" style={{ fontFamily: font.extrabold, fontSize: 28, lineHeight: 34 }}>{t('Прогресс')}</Txt>
 
       <View style={[styles.card, { backgroundColor: c.surface }]}>
         <View>
@@ -59,7 +60,7 @@ export default function Progress() {
               <Txt variant="caption" tone="muted">в среднем за день с записями</Txt>
             </View>
           ) : (
-            <Txt variant="headline" style={{ marginTop: space[2] }}>За неделю пока нет записей</Txt>
+            <Txt variant="headline" style={{ marginTop: space[2] }}>{t('За неделю пока нет записей')}</Txt>
           )}
         </View>
         <View

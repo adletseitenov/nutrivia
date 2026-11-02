@@ -11,6 +11,7 @@ import { compute, getDish } from '@/engine/engine';
 import { FEATURES } from '@/lib/features';
 import { font, radius, space } from '@/theme/tokens';
 import { useColors } from '@/theme/use-colors';
+import { getLang, setLang, t } from '@/lib/i18n';
 
 export default function Welcome() {
   const c = useColors();
@@ -23,24 +24,22 @@ export default function Welcome() {
       footer={
         <>
           <Txt variant="caption" tone="muted" center style={{ fontSize: 12, lineHeight: 16 }}>
-            Нажимая «Начать» или «Войти», вы подтверждаете, что вам есть 18 лет, и соглашаетесь, что мы храним ваши фото еды и
-            разборы и показываем их нутрициологу. Разбор — оценка по фото, не медицинская консультация. Удалить все
-            данные можно в профиле.{' '}
+            {t('Нажимая «Начать» или «Войти», вы подтверждаете, что вам есть 18 лет, и соглашаетесь, что мы храним ваши фото еды и разборы и показываем их нутрициологу. Разбор — оценка по фото, не медицинская консультация. Удалить все данные можно в профиле.')}{' '}
             <Txt variant="caption" tone="accent" style={{ fontSize: 12, lineHeight: 16 }} onPress={() => router.push({ pathname: '/legal', params: { doc: 'privacy' } })}>
-              Конфиденциальность
+              {t('Конфиденциальность')}
             </Txt>{' · '}
             <Txt variant="caption" tone="accent" style={{ fontSize: 12, lineHeight: 16 }} onPress={() => router.push({ pathname: '/legal', params: { doc: 'terms' } })}>
-              Условия
+              {t('Условия')}
             </Txt>
           </Txt>
-          <Button title="Начать" block onPress={() => router.push('/role')} />
+          <Button title={t('Начать')} block onPress={() => router.push('/role')} />
           <Pressable
             accessibilityRole="button"
             onPress={() => router.push({ pathname: '/phone', params: { mode: 'login' } })}
             hitSlop={8}
             style={{ alignSelf: 'center', minHeight: 44, justifyContent: 'center', paddingHorizontal: space[3] }}>
             <Txt variant="caption" tone="muted" center>
-              Уже есть аккаунт? <Txt variant="caption" style={{ fontFamily: font.semibold }}>Войти</Txt>
+              {t('Уже есть аккаунт?')} <Txt variant="caption" style={{ fontFamily: font.semibold }}>{t('Войти')}</Txt>
             </Txt>
           </Pressable>
         </>
@@ -48,8 +47,11 @@ export default function Welcome() {
       <View style={styles.top}>
         <Txt style={{ fontFamily: font.extrabold, fontSize: 22, lineHeight: 28, letterSpacing: -0.6 }}>Nutrivia</Txt>
         {FEATURES.kazakh && (
-          <Pressable accessibilityRole="button" style={[styles.lang, { backgroundColor: c.surface }]}>
-            <Txt variant="label">Қазақша</Txt>
+          <Pressable
+            accessibilityRole="button"
+            onPress={() => setLang(getLang() === 'kk' ? 'ru' : 'kk')}
+            style={[styles.lang, { backgroundColor: c.surface }]}>
+            <Txt variant="label">{getLang() === 'kk' ? 'Русский' : 'Қазақша'}</Txt>
           </Pressable>
         )}
       </View>
@@ -59,7 +61,7 @@ export default function Welcome() {
         <View style={styles.pill}><StatusPill status="reviewed" /></View>
         <View style={[styles.float, { backgroundColor: c.surfaceRaised }]}>
           <View style={styles.row}>
-            <Txt variant="headline">Плов, 1½ пиалы</Txt>
+            <Txt variant="headline">{t('Плов, 1½ пиалы')}</Txt>
             <Txt variant="caption" tone="muted">≈450 г</Txt>
           </View>
           <View style={[styles.row, { justifyContent: 'flex-start', gap: space[4] }]}>
@@ -72,8 +74,8 @@ export default function Welcome() {
       </View>
 
       <View style={{ gap: space[3] }}>
-        <Txt variant="display">Сфотографируйте еду. Остальное сделаем мы.</Txt>
-        <Txt tone="muted">Разбор по фото проверяет живой нутрициолог — ответ в течение 15 минут.</Txt>
+        <Txt variant="display">{t('Сфотографируйте еду. Остальное сделаем мы.')}</Txt>
+        <Txt tone="muted">{t('Разбор по фото проверяет живой нутрициолог — ответ в течение 15 минут.')}</Txt>
       </View>
     </Screen>
   );

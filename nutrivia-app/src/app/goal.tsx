@@ -12,6 +12,7 @@ import { personalTargets } from '@/engine/targets';
 import { GOALS, useAppStore } from '@/store/app-store';
 import { radius, space } from '@/theme/tokens';
 import { useColors } from '@/theme/use-colors';
+import { t } from '@/lib/i18n';
 
 export default function GoalScreen() {
   const c = useColors();
@@ -28,7 +29,7 @@ export default function GoalScreen() {
     <Screen
       footer={
         <Button
-          title="Продолжить"
+          title={t('Продолжить')}
           block
           onPress={() => {
             if (!state.onboarded) return router.push('/body'); // цель уйдёт на сервер вместе с регистрацией
@@ -39,7 +40,7 @@ export default function GoalScreen() {
         />
       }>
       <View style={styles.head}>
-        <RoundButton icon="back" label="Назад" onPress={() => router.back()} />
+        <RoundButton icon="back" label={t('Назад')} onPress={() => router.back()} />
         <View style={[styles.progress, { backgroundColor: c.track }]}>
           <View style={[styles.progressFill, { backgroundColor: c.ink }]} />
         </View>
@@ -47,8 +48,8 @@ export default function GoalScreen() {
       </View>
 
       <View style={{ gap: space[2] }}>
-        <Txt variant="display">Какая у вас цель?</Txt>
-        <Txt tone="muted">По ней и вашим параметрам посчитаем ориентир на день. Нутрициолог сможет его поменять.</Txt>
+        <Txt variant="display">{t('Какая у вас цель?')}</Txt>
+        <Txt tone="muted">{t('По ней и вашим параметрам посчитаем ориентир на день. Нутрициолог сможет его поменять.')}</Txt>
       </View>
 
       <View style={{ gap: space[3] }} accessibilityRole="radiogroup">
@@ -58,7 +59,7 @@ export default function GoalScreen() {
             <Pressable
               key={g.id}
               accessibilityRole="radio"
-              accessibilityLabel={g.title}
+              accessibilityLabel={t(g.title)}
               accessibilityState={{ checked: on }}
               onPress={() => {
                 Haptics.selectionAsync();
@@ -66,8 +67,8 @@ export default function GoalScreen() {
               }}
               style={[styles.option, { backgroundColor: on ? c.ink : c.surface }]}>
               <View style={{ flex: 1, gap: 2 }}>
-                <Txt variant="headline" style={{ color: on ? c.onInk : c.ink }}>{g.title}</Txt>
-                <Txt variant="caption" style={{ color: on ? c.onInk : c.muted, opacity: on ? 0.72 : 1 }}>{g.sub}</Txt>
+                <Txt variant="headline" style={{ color: on ? c.onInk : c.ink }}>{t(g.title)}</Txt>
+                <Txt variant="caption" style={{ color: on ? c.onInk : c.muted, opacity: on ? 0.72 : 1 }}>{t(g.sub)}</Txt>
               </View>
               <View
                 style={[
@@ -81,7 +82,7 @@ export default function GoalScreen() {
       </View>
 
       <View style={[styles.target, { backgroundColor: c.surface }]}>
-        <Txt variant="caption" tone="muted">Ориентир на день</Txt>
+        <Txt variant="caption" tone="muted">{t('Ориентир на день')}</Txt>
         <Txt variant="headline" style={{ fontSize: 15 }} numberOfLines={1}>{target}</Txt>
       </View>
     </Screen>

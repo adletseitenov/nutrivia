@@ -2,7 +2,7 @@ import { router } from 'expo-router';
 import { useEffect, useState } from 'react';
 import { Platform, Pressable, Share, StyleSheet, View } from 'react-native';
 
-import { bodyFromMe, deleteMe, exportMe, logout } from '@/api/client';
+import { bodyFromMe, deleteMe, exportMe, logout, patchLang } from '@/api/client';
 import { Icon } from '@/components/icon';
 import { Screen } from '@/components/screen';
 import { Txt } from '@/components/txt';
@@ -11,11 +11,13 @@ import { REMINDERS_SUPPORTED, remindersOn, setReminders } from '@/lib/reminders'
 import { GOALS, useAppStore, useTargets } from '@/store/app-store';
 import { font, radius, space } from '@/theme/tokens';
 import { useColors } from '@/theme/use-colors';
+import { FEATURES } from '@/lib/features';
+import { getLang, setLang, t } from '@/lib/i18n';
 
 export default function Profile() {
   const c = useColors();
   const { state, dispatch } = useAppStore();
-  const t = useTargets();
+  const tg = useTargets();
   const goal = GOALS.find((g) => g.id === state.goal)!;
   const body = bodyFromMe(state.me);
   const [reminders, setRemindersState] = useState<boolean | null>(null);
@@ -48,11 +50,21 @@ export default function Profile() {
       value: body ? `${body.heightCm} см · ${kgText(body.weightKg)} кг` : 'Указать',
       onPress: () => router.push('/body'),
     },
-    { label: 'Ориентир на день', value: `${fmt(t.kcal)} ккал${state.me?.targets?.set_by_pro ? ' · от специалиста' : ''}` },
+    { label: 'Ориентир на день', value: `${fmt(tg.kcal)} ккал${state.me?.targets?.set_by_pro ? ' · от специалиста' : ''}` },
     state.me?.coach
       ? { label: 'Тренер или нутрициолог', value: state.me.coach.name }
       : { label: 'Тренер или нутрициолог', value: 'Ввести код', onPress: () => router.push('/join') },
-    { label: 'Язык', value: 'Русский' },
+    ...(FEATURES.kazakh
+      ? [{
+          label: t('Язык'),
+          value: getLang() === 'kk' ? 'Қазақша' : 'Русский',
+          onPress: () => {
+            const next = getLang() === 'kk' ? 'ru' : 'kk';
+            patchLang(next).then((me) => dispatch({ type: 'setMe', me }), () => {});
+            setLang(next);
+          },
+        }]
+      : []),
     ...(REMINDERS_SUPPORTED
       ? [{
           label: 'Напоминания о еде',
@@ -64,7 +76,7 @@ export default function Profile() {
 
   return (
     <Screen tabs>
-      <Txt variant="title" style={{ fontFamily: font.extrabold, fontSize: 28, lineHeight: 34 }}>Профиль</Txt>
+      <Txt variant="title" style={{ fontFamily: font.extrabold, fontSize: 28, lineHeight: 34 }}>{t('Профиль')}</Txt>
       <View style={[styles.group, { backgroundColor: c.surface }]}>
         {rows.map((r, i) => (
           <Pressable
@@ -73,9 +85,9 @@ export default function Profile() {
             disabled={!r.onPress}
             accessibilityRole={r.onPress ? 'button' : undefined}
             style={[styles.row, i > 0 && { borderTopWidth: StyleSheet.hairlineWidth, borderTopColor: c.line }]}>
-            <Txt variant="caption" tone="muted" style={{ fontSize: 15 }}>{r.label}</Txt>
+            <Txt variant="caption" tone="muted" style={{ fontSize: 15 }}>{t(r.label)}</Txt>
             <View style={styles.value}>
-              <Txt variant="headline" style={{ fontSize: 15 }} numberOfLines={1}>{r.value}</Txt>
+              <Txt variant="headline" style={{ fontSize: 15 }} numberOfLines={1}>{t(r.value)}</Txt>
               {r.onPress && (
                 <View style={{ transform: [{ rotate: '180deg' }] }}>
                   <Icon name="back" size={16} color={c.muted} />
@@ -93,7 +105,7 @@ export default function Profile() {
           router.replace('/welcome');
         }}
         style={[styles.danger, { backgroundColor: c.surface }]}>
-        <Txt variant="headline" style={{ fontSize: 15 }}>Выйти</Txt>
+        <Txt variant="headline" style={{ fontSize: 15 }}>{t('Выйти')}</Txt>
       </Pressable>
       <View style={[styles.group, { backgroundColor: c.surface }]}>
         {([
@@ -103,13 +115,13 @@ export default function Profile() {
         ] as const).map(([label, value, onPress], i) => (
           <Pressable key={label} accessibilityRole="button" onPress={onPress}
             style={[styles.row, i > 0 && { borderTopWidth: StyleSheet.hairlineWidth, borderTopColor: c.line }]}>
-            <Txt style={{ fontSize: 15 }}>{label}</Txt>
-            <Txt variant="caption" tone="muted">{value || '›'}</Txt>
+            <Txt style={{ fontSize: 15 }}>{t(label)}</Txt>
+            <Txt variant="caption" tone="muted">{value ? t(value) : '›'}</Txt>
           </Pressable>
         ))}
       </View>
       <Txt variant="caption" tone="muted">
-        Удалить аккаунт и все фото можно в любой момент — данные стираются с сервера полностью.
+        {t('Удалить аккаунт и все фото можно в любой момент — данные стираются с сервера полностью.')}
       </Txt>
       <Pressable
         accessibilityRole="button"
@@ -123,7 +135,7 @@ export default function Profile() {
           router.replace('/welcome');
         }}
         style={[styles.danger, { backgroundColor: c.surface }]}>
-        <Txt variant="headline" tone="warning" style={{ fontSize: 15 }}>Удалить мои данные</Txt>
+        <Txt variant="headline" tone="warning" style={{ fontSize: 15 }}>{t('Удалить мои данные')}</Txt>
       </Pressable>
     </Screen>
   );

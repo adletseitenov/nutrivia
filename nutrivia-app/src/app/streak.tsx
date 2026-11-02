@@ -11,6 +11,7 @@ import { daysWord } from '@/lib/dates';
 import { useAppStore, useTasks, type TaskId } from '@/store/app-store';
 import { font, radius, space } from '@/theme/tokens';
 import { useColors } from '@/theme/use-colors';
+import { t } from '@/lib/i18n';
 
 const TASKS: { id: TaskId; title: string; sub: string }[] = [
   { id: 'breakfast', title: 'Фото завтрака', sub: 'до 11:00' },
@@ -30,7 +31,7 @@ export default function Streak() {
   if (!s) {
     return (
       <Screen>
-        <RoundButton icon="back" label="Назад" onPress={() => router.back()} />
+        <RoundButton icon="back" label={t('Назад')} onPress={() => router.back()} />
         <ActivityIndicator color={c.ink} style={{ marginTop: space[6] }} />
       </Screen>
     );
@@ -41,8 +42,8 @@ export default function Streak() {
   return (
     <Screen>
       <View style={styles.head}>
-        <RoundButton icon="back" label="Назад" onPress={() => router.back()} />
-        <Txt variant="headline">Серия</Txt>
+        <RoundButton icon="back" label={t('Назад')} onPress={() => router.back()} />
+        <Txt variant="headline">{t('Серия')}</Txt>
         <View style={{ width: 44 }} />
       </View>
 
@@ -83,7 +84,7 @@ export default function Streak() {
 
       <View style={[styles.tasks, { backgroundColor: c.surface }]}>
         <View style={styles.tasksHead}>
-          <Txt variant="headline">Задания на сегодня</Txt>
+          <Txt variant="headline">{t('Задания на сегодня')}</Txt>
           <Txt variant="label" tone="accent" style={{ fontSize: 13 }}>{done} из {TASKS.length}</Txt>
         </View>
         {TASKS.map((t) => {

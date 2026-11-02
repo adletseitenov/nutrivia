@@ -6,6 +6,7 @@ import { recentDishes, searchDishes, type DishHit } from '@/api/client';
 import { fmt } from '@/engine/engine';
 import { font, radius, space } from '@/theme/tokens';
 import { useColors } from '@/theme/use-colors';
+import { t } from '@/lib/i18n';
 
 import { Icon } from './icon';
 import { RoundButton } from './round-button';
@@ -45,24 +46,24 @@ export function AddDishSheet({ visible, onClose, onPick }: {
     <Modal visible={visible} animationType="slide" presentationStyle="pageSheet" onRequestClose={onClose}>
       <View style={[styles.root, { backgroundColor: c.bg, paddingBottom: insets.bottom }]}>
         <View style={styles.head}>
-          <Txt variant="title">Добавить блюдо</Txt>
-          <RoundButton icon="close" label="Закрыть" onPress={onClose} />
+          <Txt variant="title">{t('Добавить блюдо')}</Txt>
+          <RoundButton icon="close" label={t('Закрыть')} onPress={onClose} />
         </View>
         <View style={[styles.search, { backgroundColor: c.surface }]}>
           <Icon name="search" size={20} color={c.muted} />
           <TextInput
             value={q}
             onChangeText={setQ}
-            placeholder="Например, манты или лепёшка"
+            placeholder={t('Например, манты или лепёшка')}
             placeholderTextColor={c.muted}
             autoFocus
             autoCorrect={false}
             returnKeyType="search"
-            accessibilityLabel="Поиск блюда"
+            accessibilityLabel={t('Поиск блюда')}
             style={[styles.input, { color: c.ink }]}
           />
         </View>
-        {failed && <Txt tone="muted" center>Нет связи с сервером. Попробуйте ещё раз.</Txt>}
+        {failed && <Txt tone="muted" center>{t('Нет связи с сервером. Попробуйте ещё раз.')}</Txt>}
         {!hits && !failed && <ActivityIndicator color={c.ink} style={{ marginTop: space[5] }} />}
         {hits && (
           <FlatList
@@ -72,7 +73,7 @@ export function AddDishSheet({ visible, onClose, onPick }: {
             contentContainerStyle={{ gap: space[2], paddingBottom: space[5] }}
             ListEmptyComponent={
               <Txt tone="muted" center style={{ marginTop: space[5] }}>
-                Такого блюда нет в базе. Напишите его в комментарии — нутрициолог добавит вручную.
+                {t('Такого блюда нет в базе. Напишите его в комментарии — нутрициолог добавит вручную.')}
               </Txt>
             }
             renderItem={({ item }) => (

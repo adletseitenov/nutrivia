@@ -13,6 +13,7 @@ import { daysWord } from '@/lib/dates';
 import { itemsFromServer, mealNutrients, useAppStore } from '@/store/app-store';
 import { font, radius, space } from '@/theme/tokens';
 import { useColors } from '@/theme/use-colors';
+import { t } from '@/lib/i18n';
 
 /**
  * Кабинет тренера, нутрициолога или оператора Nutrivia: очередь разборов на проверку и клиенты за сегодня.
@@ -80,7 +81,7 @@ export default function Pro() {
         <>
           {!isOperator && (
             <View style={[styles.codeCard, { backgroundColor: c.ink }]}>
-              <Txt variant="caption" style={{ color: c.onInk, opacity: 0.7 }}>Ваш код для учеников</Txt>
+              <Txt variant="caption" style={{ color: c.onInk, opacity: 0.7 }}>{t('Ваш код для учеников')}</Txt>
               <Txt style={{ fontFamily: font.extrabold, fontSize: 40, lineHeight: 46, letterSpacing: 4, color: c.onInk }} selectable>
                 {pro.invite_code}
               </Txt>
@@ -89,17 +90,17 @@ export default function Pro() {
                   ? `Учеников: ${pro.students} из ${pro.limit}`
                   : `Учеников: ${pro.students}`}
               </Txt>
-              <Button title="Отправить код" variant="accent" onPress={share} style={{ alignSelf: 'flex-start', marginTop: space[2] }} />
+              <Button title={t('Отправить код')} variant="accent" onPress={share} style={{ alignSelf: 'flex-start', marginTop: space[2] }} />
             </View>
           )}
 
           <View style={{ gap: space[3] }}>
             <View style={styles.row}>
-              <Txt variant="title" style={{ fontSize: 20, lineHeight: 26 }}>Ждут проверки</Txt>
+              <Txt variant="title" style={{ fontSize: 20, lineHeight: 26 }}>{t('Ждут проверки')}</Txt>
               {queue.length > 0 && <Txt variant="caption" tone="muted">{queue.length}</Txt>}
             </View>
             {queue.length === 0 ? (
-              <Txt variant="caption" tone="muted">Все разборы проверены.</Txt>
+              <Txt variant="caption" tone="muted">{t('Все разборы проверены.')}</Txt>
             ) : (
               queue.map((m) => {
                 const items = itemsFromServer(m.items);
@@ -126,7 +127,7 @@ export default function Pro() {
             <Txt variant="title" style={{ fontSize: 20, lineHeight: 26 }}>{isOperator ? 'Клиенты без тренера' : 'Ученики сегодня'}</Txt>
             {data.students.length === 0 && (
               <View style={[styles.empty, { backgroundColor: c.surface }]}>
-                <Txt variant="headline" center>Пока никого</Txt>
+                <Txt variant="headline" center>{t('Пока никого')}</Txt>
                 <Txt variant="caption" tone="muted" center>
                   {isOperator ? 'Все клиенты пока с тренерами.' : 'Отправьте код ученику — он введёт его при регистрации или в профиле.'}
                 </Txt>
@@ -164,7 +165,7 @@ export default function Pro() {
           ? 'Здесь разборы клиентов без тренера и разборы учеников, которые ждут дольше 15 минут.'
           : 'Разборы приходят сюда сразу после фото. Ученик ждёт проверку в течение 15 минут — если не успеваете, их проверят операторы Nutrivia.'}
       </Txt>
-      <Button title="Выйти" variant="secondary" onPress={signOut} />
+      <Button title={t('Выйти')} variant="secondary" onPress={signOut} />
     </Screen>
   );
 }

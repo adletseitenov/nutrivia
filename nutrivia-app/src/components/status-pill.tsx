@@ -2,6 +2,7 @@ import { StyleSheet, View } from 'react-native';
 
 import { radius } from '@/theme/tokens';
 import { useColors } from '@/theme/use-colors';
+import { t } from '@/lib/i18n';
 
 import { Icon } from './icon';
 import { Txt } from './txt';
@@ -33,7 +34,7 @@ export function StatusPill({ status, label }: { status: MealStatus; label?: stri
         <View style={[styles.dot, { backgroundColor: fg }]} />
       )}
       <Txt variant="label" style={{ color: fg }} numberOfLines={1}>
-        {label ?? LABELS[status]}
+        {t(label ?? LABELS[status])}
       </Txt>
     </View>
   );

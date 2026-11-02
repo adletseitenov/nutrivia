@@ -13,13 +13,14 @@ import { fmt } from '@/engine/engine';
 import { refreshToday, useAppStore, useTargets, useToday } from '@/store/app-store';
 import { font, radius, space } from '@/theme/tokens';
 import { useColors } from '@/theme/use-colors';
+import { t } from '@/lib/i18n';
 
 /** Фото холодильника → продукты (ИИ) → блюда из базы под остаток дня (Engine). Продукты можно поправить. */
 export default function Fridge() {
   const c = useColors();
   const { dispatch } = useAppStore();
   const { photo } = useLocalSearchParams<{ photo?: string }>();
-  const t = useTargets();
+  const tg = useTargets();
   const eaten = useToday();
   const [res, setRes] = useState<FridgeResult | null>(null);
   const [error, setError] = useState<string | null>(null);
@@ -52,16 +53,16 @@ export default function Fridge() {
     }
   }
 
-  const left = Math.max(0, t.kcal - eaten.kcal);
-  const proteinLeft = Math.max(0, t.protein - eaten.protein);
+  const left = Math.max(0, tg.kcal - eaten.kcal);
+  const proteinLeft = Math.max(0, tg.protein - eaten.protein);
   const products = res?.products ?? [];
 
   return (
     <Screen>
       <View style={styles.head}>
-        <RoundButton icon="back" label="Назад" onPress={() => (router.canGoBack() ? router.back() : router.replace('/today'))} />
+        <RoundButton icon="back" label={t('Назад')} onPress={() => (router.canGoBack() ? router.back() : router.replace('/today'))} />
         <View style={{ flex: 1 }}>
-          <Txt variant="title">Что приготовить</Txt>
+          <Txt variant="title">{t('Что приготовить')}</Txt>
           <Txt variant="caption" tone="muted">
             {res ? `Нашли на фото: ${products.length} · оценка по фото` : error ? 'Разбор не получился' : 'Разбираем фото холодильника…'}
           </Txt>
@@ -71,7 +72,7 @@ export default function Fridge() {
       {error && (
         <View style={{ gap: space[3] }}>
           <Txt tone="warning">{error}</Txt>
-          <Button title="Снять ещё раз" onPress={() => router.replace('/camera')} />
+          <Button title={t('Снять ещё раз')} onPress={() => router.replace('/camera')} />
         </View>
       )}
       {!res && !error && <ActivityIndicator color={c.ink} style={{ marginTop: space[6] }} />}
@@ -94,10 +95,10 @@ export default function Fridge() {
                 autoFocus
                 value={extra}
                 onChangeText={setExtra}
-                placeholder="например, рис"
+                placeholder={t('например, рис')}
                 placeholderTextColor={c.muted}
                 returnKeyType="done"
-                accessibilityLabel="Добавить продукт"
+                accessibilityLabel={t('Добавить продукт')}
                 onSubmitEditing={() => {
                   const v = extra.trim().toLowerCase();
                   setAdding(false);
@@ -116,18 +117,18 @@ export default function Fridge() {
 
           <View style={[styles.left, { backgroundColor: c.surface }]}>
             <View style={styles.row}>
-              <Txt variant="caption" tone="muted">Осталось на сегодня</Txt>
+              <Txt variant="caption" tone="muted">{t('Осталось на сегодня')}</Txt>
               <Txt variant="headline">{fmt(left)} ккал · белок {fmt(proteinLeft)} г</Txt>
             </View>
             <View style={[styles.track, { backgroundColor: c.track }]}>
-              <View style={{ width: `${Math.min(100, (eaten.kcal / t.kcal) * 100)}%`, height: 6, borderRadius: 3, backgroundColor: c.accent }} />
+              <View style={{ width: `${Math.min(100, (eaten.kcal / tg.kcal) * 100)}%`, height: 6, borderRadius: 3, backgroundColor: c.accent }} />
             </View>
           </View>
 
-          <Txt variant="title" style={{ fontSize: 20, lineHeight: 26 }}>Можно приготовить</Txt>
+          <Txt variant="title" style={{ fontSize: 20, lineHeight: 26 }}>{t('Можно приготовить')}</Txt>
           <View style={{ gap: 10 }}>
             {res.ideas.length === 0 && (
-              <Txt tone="muted">Из этих продуктов в базе пока нет готовых блюд. Добавьте продукт или снимите полку целиком.</Txt>
+              <Txt tone="muted">{t('Из этих продуктов в базе пока нет готовых блюд. Добавьте продукт или снимите полку целиком.')}</Txt>
             )}
             {res.ideas.map((i) => (
               <View key={i.title} style={[styles.idea, { backgroundColor: c.surface }]}>

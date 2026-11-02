@@ -13,6 +13,7 @@ import { compute, fmt, getDish, portionText } from '@/engine/engine';
 import { refreshToday, useAppStore } from '@/store/app-store';
 import { font, radius, space } from '@/theme/tokens';
 import { useColors } from '@/theme/use-colors';
+import { t } from '@/lib/i18n';
 
 type Row = { dishId: string; name: string; grams: string };
 
@@ -62,9 +63,9 @@ export default function Manual() {
           />
         </>
       }>
-      <RoundButton icon="back" label="Назад" onPress={() => router.back()} />
+      <RoundButton icon="back" label={t('Назад')} onPress={() => router.back()} />
       <View style={{ gap: space[2] }}>
-        <Txt variant="display">Без фото</Txt>
+        <Txt variant="display">{t('Без фото')}</Txt>
         <Txt tone="muted">
           {label ? `Запишем в ${label}. ` : ''}Выберите блюда и примерный вес — калории посчитаем по базе.
         </Txt>

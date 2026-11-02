@@ -7,6 +7,7 @@ import { kgText } from '@/engine/engine';
 import { dayLabel } from '@/lib/dates';
 import { radius, space } from '@/theme/tokens';
 import { useColors } from '@/theme/use-colors';
+import { t } from '@/lib/i18n';
 
 import { Txt } from './txt';
 
@@ -36,7 +37,7 @@ export function WeightCard({ data, readOnly }: { data: ServerWeights | null; rea
       style={({ pressed }) => [styles.card, { backgroundColor: c.surface, opacity: pressed ? 0.85 : 1 }]}>
       <View style={styles.row}>
         <View style={{ gap: 2 }}>
-          <Txt variant="caption" tone="muted">Вес</Txt>
+          <Txt variant="caption" tone="muted">{t('Вес')}</Txt>
           <Txt variant="numberM">{last ? `${kgText(last.kg)} кг` : '—'}</Txt>
         </View>
         <View style={{ alignItems: 'flex-end', gap: 2 }}>
@@ -45,7 +46,7 @@ export function WeightCard({ data, readOnly }: { data: ServerWeights | null; rea
               {change === 0 ? 'без изменений' : `${change > 0 ? '+' : '−'}${kgText(Math.abs(change))} кг с ${dayLabel(pts[0].date)}`}
             </Txt>
           )}
-          {!readOnly && <Txt variant="headline" tone="accent" style={{ fontSize: 15 }}>{last ? '+ Записать' : 'Записать вес'}</Txt>}
+          {!readOnly && <Txt variant="headline" tone="accent" style={{ fontSize: 15 }}>{t(last ? '+ Записать' : 'Записать вес')}</Txt>}
         </View>
       </View>
       {pts.length > 1 ? (

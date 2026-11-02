@@ -11,6 +11,7 @@ import { Txt } from '@/components/txt';
 import { useAppStore } from '@/store/app-store';
 import { space } from '@/theme/tokens';
 import { useColors } from '@/theme/use-colors';
+import { t } from '@/lib/i18n';
 
 /** 10 цифр после +7 → «707 123 45 67» */
 function formatLocal(digits: string) {
@@ -46,13 +47,13 @@ export default function Phone() {
       footer={
         <>
           <Txt variant="caption" tone="muted" center style={{ fontSize: 12, lineHeight: 16 }}>
-            Номер нужен только для входа по коду.
+            {t('Номер нужен только для входа по коду.')}
           </Txt>
           <Button title={sending ? 'Отправляем…' : 'Получить код'} block disabled={digits.length !== 10 || sending} onPress={send} />
         </>
       }>
       <View style={styles.head}>
-        <RoundButton icon="back" label="Назад" onPress={() => router.back()} />
+        <RoundButton icon="back" label={t('Назад')} onPress={() => router.back()} />
         {!login && (
           <>
             <View style={[styles.progress, { backgroundColor: c.track }]}>
@@ -67,7 +68,7 @@ export default function Phone() {
         <Txt tone="muted">{login ? 'Введите номер, с которым регистрировались.' : 'По нему вы будете входить в приложение.'}</Txt>
       </View>
       <TextField
-        label="Номер телефона"
+        label={t('Номер телефона')}
         prefix="+7"
         big
         value={formatLocal(digits)}
@@ -86,10 +87,10 @@ export default function Phone() {
       />
       {!login && isClient && (
         <TextField
-          label="Код тренера или нутрициолога — если дали"
+          label={t('Код тренера или нутрициолога — если дали')}
           value={state.signup.inviteCode}
           onChangeText={(v) => dispatch({ type: 'setSignup', patch: { inviteCode: v.replace(/\s/g, '').toLowerCase() } })}
-          placeholder="Например, k7m2px"
+          placeholder={t('Например, k7m2px')}
           autoCapitalize="none"
           autoCorrect={false}
           maxLength={16}

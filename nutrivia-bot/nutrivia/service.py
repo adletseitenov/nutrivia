@@ -383,11 +383,13 @@ class Service:
         if meal["ai_draft"]:
             conf = {d["name"]: d.get("confidence") for d in json.loads(meal["ai_draft"]).get("dishes", [])}
         items = []
+        owner = await self.db.get_user(user_id)
+        kk = owner is not None and owner["lang"] == "kk"
         for r in await self.db.meal_items(meal_id):
             dish = self.base.get(r["dish_id"])
             items.append({
                 "dish_id": r["dish_id"], "raw_name": r["raw_name"],
-                "name": dish.name_ru if dish else r["raw_name"],
+                "name": (dish.name_kk if kk and dish.name_kk else dish.name_ru) if dish else r["raw_name"],
                 "grams": r["grams"], "ai_grams": r["ai_grams"], "portion": r["portion"],
                 "unit": dish.unit if dish else None,
                 "unit_grams": dish.unit_grams if dish else None,

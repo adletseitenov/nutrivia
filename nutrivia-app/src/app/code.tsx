@@ -10,6 +10,7 @@ import { Txt } from '@/components/txt';
 import { refreshToday, useAppStore } from '@/store/app-store';
 import { font, radius, space } from '@/theme/tokens';
 import { useColors } from '@/theme/use-colors';
+import { t } from '@/lib/i18n';
 
 const LEN = 4;
 
@@ -85,7 +86,7 @@ export default function Code() {
 
   return (
     <Screen>
-      <RoundButton icon="back" label="Назад" onPress={() => router.back()} />
+      <RoundButton icon="back" label={t('Назад')} onPress={() => router.back()} />
       <View style={{ gap: space[2] }}>
         <Txt variant="display">{manual ? 'Код входа' : 'Код из SMS'}</Txt>
         <Txt tone="muted">
@@ -125,10 +126,10 @@ export default function Code() {
       />
 
       {error && <Txt variant="caption" tone="warning">{error}</Txt>}
-      {busy && <Txt variant="caption" tone="muted">Проверяем…</Txt>}
+      {busy && <Txt variant="caption" tone="muted">{t('Проверяем…')}</Txt>}
 
       {manual ? (
-        <Txt variant="caption" tone="muted">Нет кода или он не подходит — напишите команде Nutrivia, пришлём новый.</Txt>
+        <Txt variant="caption" tone="muted">{t('Нет кода или он не подходит — напишите команде Nutrivia, пришлём новый.')}</Txt>
       ) : (
         <Pressable accessibilityRole="button" disabled={wait > 0} onPress={resend} style={styles.resend}>
           <Txt variant="headline" style={{ fontSize: 15, color: wait > 0 ? c.muted : c.accentText }}>

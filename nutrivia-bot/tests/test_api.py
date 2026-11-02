@@ -690,3 +690,11 @@ def test_security_headers_and_export(client):
     assert r.headers["X-Content-Type-Options"] == "nosniff" and r.headers["X-Frame-Options"] == "DENY"
     data = r.json()
     assert len(data["meals"]) == 1 and data["weights"][0]["kg"] == 70 and "phone" not in str(data["profile"])
+
+
+def test_kazakh_dish_names(client):
+    h = register(client)
+    meal = upload(client, h).json()
+    assert meal["items"][0]["name"] == "Плов с говядиной"
+    assert client.patch("/v1/me", headers=h, json={"lang": "kk"}).json()["lang"] == "kk"
+    assert client.get(f"/v1/meals/{meal['id']}", headers=h).json()["items"][0]["name"] == "Палау"

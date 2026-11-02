@@ -11,6 +11,7 @@ import { Txt } from '@/components/txt';
 import { fmt, kgText } from '@/engine/engine';
 import { refreshToday, useAppStore } from '@/store/app-store';
 import { space } from '@/theme/tokens';
+import { t } from '@/lib/i18n';
 
 /** Записать вес. Раз в день: повтор в тот же день заменяет прежнее значение. Норма пересчитывается на сервере. */
 export default function WeightScreen() {
@@ -40,15 +41,15 @@ export default function WeightScreen() {
   const kcal = state.me?.targets?.kcal;
   return (
     <Screen footer={<Button title={saving ? 'Сохраняем…' : 'Сохранить'} block disabled={!valid || saving} onPress={save} />}>
-      <RoundButton icon="back" label="Назад" onPress={() => router.back()} />
+      <RoundButton icon="back" label={t('Назад')} onPress={() => router.back()} />
       <View style={{ gap: space[2] }}>
-        <Txt variant="display">Вес сегодня</Txt>
+        <Txt variant="display">{t('Вес сегодня')}</Txt>
         <Txt tone="muted">
           Лучше утром, до еды. По весу уточним ориентир{kcal ? ` — сейчас ${fmt(kcal)} ккал` : ''}.
         </Txt>
       </View>
       <TextField
-        label="Вес, кг"
+        label={t('Вес, кг')}
         big
         value={value}
         onChangeText={(v) => {

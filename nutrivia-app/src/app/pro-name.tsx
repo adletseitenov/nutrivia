@@ -9,6 +9,7 @@ import { Txt } from '@/components/txt';
 import { useAppStore } from '@/store/app-store';
 import { space } from '@/theme/tokens';
 import { useColors } from '@/theme/use-colors';
+import { t } from '@/lib/i18n';
 
 /** Имя тренера или нутрициолога — его видят ученики. */
 export default function ProName() {
@@ -18,16 +19,16 @@ export default function ProName() {
   const isTrainer = state.signup.role === 'trainer';
 
   return (
-    <Screen footer={<Button title="Продолжить" block disabled={!name.trim()} onPress={() => router.push('/phone')} />}>
+    <Screen footer={<Button title={t('Продолжить')} block disabled={!name.trim()} onPress={() => router.push('/phone')} />}>
       <View style={styles.head}>
-        <RoundButton icon="back" label="Назад" onPress={() => router.back()} />
+        <RoundButton icon="back" label={t('Назад')} onPress={() => router.back()} />
         <View style={[styles.progress, { backgroundColor: c.track }]}>
           <View style={[styles.progressFill, { backgroundColor: c.ink }]} />
         </View>
         <Txt variant="caption" tone="muted">2 из 4</Txt>
       </View>
       <View style={{ gap: space[2] }}>
-        <Txt variant="display">Как вас зовут?</Txt>
+        <Txt variant="display">{t('Как вас зовут?')}</Txt>
         <Txt tone="muted">
           {isTrainer
             ? 'Имя увидят ваши ученики, когда введут ваш код. Учеников может быть до 5.'
@@ -35,10 +36,10 @@ export default function ProName() {
         </Txt>
       </View>
       <TextField
-        label="Имя"
+        label={t('Имя')}
         value={name}
         onChangeText={(v) => dispatch({ type: 'setSignup', patch: { name: v } })}
-        placeholder="Например, Динара"
+        placeholder={t('Например, Динара')}
         autoFocus
         autoCapitalize="words"
         textContentType="givenName"

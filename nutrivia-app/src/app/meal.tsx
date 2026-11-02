@@ -14,6 +14,7 @@ import { fmt, getDish, portionText } from '@/engine/engine';
 import { itemsFromServer, mealNutrients, refreshToday, useAppStore } from '@/store/app-store';
 import { radius, space } from '@/theme/tokens';
 import { useColors } from '@/theme/use-colors';
+import { t } from '@/lib/i18n';
 
 const ROLE_LABEL = { trainer: 'ваш тренер', nutritionist: 'ваш нутрициолог', operator: 'команда Nutrivia' } as const;
 
@@ -72,7 +73,7 @@ export default function Meal() {
     return (
       <View style={[styles.center, { backgroundColor: c.bg, paddingTop: insets.top }]}>
         {error ? <Txt tone="warning" center>{error}</Txt> : <ActivityIndicator color={c.ink} />}
-        <Button title="Назад" variant="secondary" onPress={() => router.back()} />
+        <Button title={t('Назад')} variant="secondary" onPress={() => router.back()} />
       </View>
     );
   }
@@ -92,7 +93,7 @@ export default function Meal() {
           <View style={{ height: insets.top + 64 }} />
         )}
         <View style={[styles.photoBar, { top: insets.top + space[2] }]}>
-          <RoundButton icon="back" label="Назад" onPress={() => router.back()} />
+          <RoundButton icon="back" label={t('Назад')} onPress={() => router.back()} />
           <StatusPill status={reviewed ? 'reviewed' : manual ? 'manual' : 'draft'} label={reviewed ? reviewedLabel(meal.reviewer?.role) : undefined} />
         </View>
       </View>
@@ -130,7 +131,7 @@ export default function Meal() {
                   {changed && (
                     <Txt variant="caption" tone="accent">по фото было ≈{fmt(it.ai_grams ?? 0)} г — поправлено при проверке</Txt>
                   )}
-                  {!dish && <Txt variant="caption" tone="warning">Нет в нашей базе — нутрициолог уточнит</Txt>}
+                  {!dish && <Txt variant="caption" tone="warning">{t('Нет в нашей базе — нутрициолог уточнит')}</Txt>}
                 </View>
               </View>
             );
@@ -159,13 +160,13 @@ export default function Meal() {
           <View style={[styles.waiting, { backgroundColor: c.accentTint }]}>
             <Icon name="clock" size={20} color={c.accentText} />
             <Txt variant="caption" style={{ flex: 1, fontSize: 14, lineHeight: 20 }}>
-              Это оценка по фото. Нутрициолог проверит разбор в течение 15 минут — комментарий появится здесь.
+              {t('Это оценка по фото. Нутрициолог проверит разбор в течение 15 минут — комментарий появится здесь.')}
             </Txt>
           </View>
         )}
         {error && <Txt variant="caption" tone="warning">{error}</Txt>}
         <Pressable accessibilityRole="button" onPress={remove} style={[styles.delete, { backgroundColor: c.surface }]}>
-          <Txt variant="headline" tone="warning" style={{ fontSize: 15 }}>Удалить приём пищи</Txt>
+          <Txt variant="headline" tone="warning" style={{ fontSize: 15 }}>{t('Удалить приём пищи')}</Txt>
         </Pressable>
       </View>
     </ScrollView>

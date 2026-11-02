@@ -9,9 +9,10 @@ import {
 import { DarkTheme, DefaultTheme, router, Stack, ThemeProvider, useSegments } from 'expo-router';
 import * as SplashScreen from 'expo-splash-screen';
 import { StatusBar } from 'expo-status-bar';
-import { useEffect } from 'react';
+import { useEffect, useState } from 'react';
 
 import { useColorScheme } from '@/hooks/use-color-scheme';
+import { loadLang, useLang } from '@/lib/i18n';
 import { AppStoreProvider, useAppStore } from '@/store/app-store';
 import { palette } from '@/theme/tokens';
 
@@ -33,7 +34,13 @@ function SessionGuard() {
 
 export default function RootLayout() {
   const scheme = useColorScheme();
-  const [loaded] = useFonts({ Onest_400Regular, Onest_500Medium, Onest_600SemiBold, Onest_700Bold, Onest_800ExtraBold });
+  const [fonts] = useFonts({ Onest_400Regular, Onest_500Medium, Onest_600SemiBold, Onest_700Bold, Onest_800ExtraBold });
+  const [langReady, setLangReady] = useState(false);
+  const lang = useLang();
+  useEffect(() => {
+    loadLang().finally(() => setLangReady(true));
+  }, []);
+  const loaded = fonts && langReady;
 
   useEffect(() => {
     if (loaded) SplashScreen.hideAsync();
@@ -51,7 +58,8 @@ export default function RootLayout() {
       <AppStoreProvider>
         <StatusBar style={dark ? 'light' : 'dark'} />
         <SessionGuard />
-        <Stack screenOptions={{ headerShown: false, contentStyle: { backgroundColor: c.bg } }}>
+        {/* key: смена языка перерисовывает все экраны с новыми текстами */}
+        <Stack key={lang} screenOptions={{ headerShown: false, contentStyle: { backgroundColor: c.bg } }}>
           <Stack.Screen name="index" />
           <Stack.Screen name="welcome" />
           <Stack.Screen name="role" />

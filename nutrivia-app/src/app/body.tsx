@@ -14,6 +14,7 @@ import { ACTIVITIES, personalTargets, type Activity, type Body, type Sex } from 
 import { refreshToday, useAppStore } from '@/store/app-store';
 import { radius, space } from '@/theme/tokens';
 import { useColors } from '@/theme/use-colors';
+import { t } from '@/lib/i18n';
 
 const YEAR = new Date().getFullYear();
 
@@ -71,7 +72,7 @@ export default function BodyScreen() {
         <>
           {preview && (
             <View style={[styles.target, { backgroundColor: c.surface }]}>
-              <Txt variant="caption" tone="muted">Ориентир на день</Txt>
+              <Txt variant="caption" tone="muted">{t('Ориентир на день')}</Txt>
               <Txt variant="headline" style={{ fontSize: 15 }} numberOfLines={1}>
                 {setByPro ? 'задал нутрициолог' : `${fmt(preview.kcal)} ккал · белок ${preview.protein} г`}
               </Txt>
@@ -82,7 +83,7 @@ export default function BodyScreen() {
         </>
       }>
       <View style={styles.head}>
-        <RoundButton icon="back" label="Назад" onPress={() => router.back()} />
+        <RoundButton icon="back" label={t('Назад')} onPress={() => router.back()} />
         {!editing && (
           <>
             <View style={[styles.progress, { backgroundColor: c.track }]}>
@@ -94,8 +95,8 @@ export default function BodyScreen() {
       </View>
 
       <View style={{ gap: space[2] }}>
-        <Txt variant="display">Немного о вас</Txt>
-        <Txt tone="muted">Посчитаем личный ориентир калорий и белка. Видите его только вы и ваш специалист.</Txt>
+        <Txt variant="display">{t('Немного о вас')}</Txt>
+        <Txt tone="muted">{t('Посчитаем личный ориентир калорий и белка. Видите его только вы и ваш специалист.')}</Txt>
       </View>
 
       <View style={styles.row} accessibilityRole="radiogroup">
@@ -105,49 +106,49 @@ export default function BodyScreen() {
             <Pressable
               key={s}
               accessibilityRole="radio"
-              accessibilityLabel={s === 'f' ? 'Женщина' : 'Мужчина'}
+              accessibilityLabel={t(s === 'f' ? 'Женщина' : 'Мужчина')}
               accessibilityState={{ checked: on }}
               onPress={() => {
                 Haptics.selectionAsync();
                 setSex(s);
               }}
               style={[styles.chip, { backgroundColor: on ? c.ink : c.surface }]}>
-              <Txt variant="headline" style={{ color: on ? c.onInk : c.ink }}>{s === 'f' ? 'Женщина' : 'Мужчина'}</Txt>
+              <Txt variant="headline" style={{ color: on ? c.onInk : c.ink }}>{t(s === 'f' ? 'Женщина' : 'Мужчина')}</Txt>
             </Pressable>
           );
         })}
       </View>
 
-      <TextField label="Год рождения" value={year} onChangeText={(v) => setYear(digits(v, 4))} placeholder="1995"
+      <TextField label={t('Год рождения')} value={year} onChangeText={(v) => setYear(digits(v, 4))} placeholder="1995"
         keyboardType="number-pad" maxLength={4} error={problems.year || null} />
       <View style={styles.row}>
         <View style={{ flex: 1 }}>
-          <TextField label="Рост, см" value={height} onChangeText={(v) => setHeight(digits(v, 3))} placeholder="165"
+          <TextField label={t('Рост, см')} value={height} onChangeText={(v) => setHeight(digits(v, 3))} placeholder="165"
             keyboardType="number-pad" maxLength={3} error={problems.height} />
         </View>
         <View style={{ flex: 1 }}>
-          <TextField label="Вес, кг" value={weight} onChangeText={(v) => setWeight(v.replace(/[^\d.,]/g, '').slice(0, 5))}
+          <TextField label={t('Вес, кг')} value={weight} onChangeText={(v) => setWeight(v.replace(/[^\d.,]/g, '').slice(0, 5))}
             placeholder="70" keyboardType="decimal-pad" maxLength={5} error={problems.weight} />
         </View>
       </View>
 
       <View style={{ gap: space[2] }} accessibilityRole="radiogroup">
-        <Txt variant="caption" tone="muted">Активность</Txt>
+        <Txt variant="caption" tone="muted">{t('Активность')}</Txt>
         {ACTIVITIES.map((a) => {
           const on = activity === a.id;
           return (
             <Pressable
               key={a.id}
               accessibilityRole="radio"
-              accessibilityLabel={`${a.title}: ${a.sub}`}
+              accessibilityLabel={`${t(a.title)}: ${t(a.sub)}`}
               accessibilityState={{ checked: on }}
               onPress={() => {
                 Haptics.selectionAsync();
                 setActivity(a.id);
               }}
               style={[styles.option, { backgroundColor: on ? c.ink : c.surface }]}>
-              <Txt variant="headline" style={{ color: on ? c.onInk : c.ink, fontSize: 15 }}>{a.title}</Txt>
-              <Txt variant="caption" style={{ color: on ? c.onInk : c.muted, opacity: on ? 0.72 : 1 }}>{a.sub}</Txt>
+              <Txt variant="headline" style={{ color: on ? c.onInk : c.ink, fontSize: 15 }}>{t(a.title)}</Txt>
+              <Txt variant="caption" style={{ color: on ? c.onInk : c.muted, opacity: on ? 0.72 : 1 }}>{t(a.sub)}</Txt>
             </Pressable>
           );
         })}

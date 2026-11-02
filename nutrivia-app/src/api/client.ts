@@ -11,6 +11,7 @@ import * as SecureStore from 'expo-secure-store';
 import { Platform } from 'react-native';
 
 import type { Activity, Body } from '@/engine/targets';
+import { getLang, type Lang } from '@/lib/i18n';
 import type { Goal } from '@/store/app-store';
 
 const WEB = Platform.OS === 'web';
@@ -214,7 +215,7 @@ export async function smsVerify(phone: string, code: string, signup: SignupData)
     {
       method: 'POST',
       ...json({
-        phone, code, consent: true, lang: 'ru', role: signup.role,
+        phone, code, consent: true, lang: getLang(), role: signup.role,
         goal: signup.role === 'client' && signup.goal ? (signup.goal === 'coach' ? 'coach_plan' : signup.goal) : undefined,
         name: signup.name || undefined,
         invite_code: signup.inviteCode || undefined,
@@ -238,6 +239,8 @@ export const getMe = () => request<Me>('/v1/me');
 
 export const patchGoal = (goal: Goal) =>
   request<Me>('/v1/me', { method: 'PATCH', ...json({ goal: goal === 'coach' ? 'coach_plan' : goal }) });
+
+export const patchLang = (lang: Lang) => request<Me>('/v1/me', { method: 'PATCH', ...json({ lang }) });
 
 /** Параметры для личной нормы калорий. */
 export const patchBody = (b: Body) =>

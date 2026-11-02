@@ -185,6 +185,7 @@ def create_app(cfg: Config | None = None, vision: VisionProvider | None = None, 
         height_cm: float | None = Field(default=None, ge=120, le=230)
         weight_kg: float | None = Field(default=None, ge=35, le=300)
         activity: Literal["low", "light", "mid", "high"] | None = None
+        lang: Literal["ru", "kk"] | None = None
 
     class JoinIn(BaseModel):
         invite_code: str = Field(min_length=4, max_length=16)

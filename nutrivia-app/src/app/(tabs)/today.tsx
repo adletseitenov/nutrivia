@@ -14,11 +14,12 @@ import { dayLabel, dayOfMonth, daysWord, todayTitle, WEEKDAYS_SHORT } from '@/li
 import { mealFromServer, mealNutrients, refreshToday, useAppStore, useTargets, useToday } from '@/store/app-store';
 import { font, radius, space } from '@/theme/tokens';
 import { useColors } from '@/theme/use-colors';
+import { t } from '@/lib/i18n';
 
 export default function Today() {
   const c = useColors();
   const { state, dispatch } = useAppStore();
-  const t = useTargets();
+  const tg = useTargets();
   const eaten = useToday();
   const streak = state.progress?.streak;
   const week = state.progress?.week.days ?? [];
@@ -93,36 +94,36 @@ export default function Today() {
       </View>
 
       <View style={[styles.ringCard, { backgroundColor: c.surface }]}>
-        <CalorieRing consumed={dayEaten.kcal} target={t.kcal} />
-        <Txt variant="caption" tone="muted">Съедено {fmt(dayEaten.kcal)} из {fmt(t.kcal)} ккал по записанному</Txt>
+        <CalorieRing consumed={dayEaten.kcal} target={tg.kcal} />
+        <Txt variant="caption" tone="muted">Съедено {fmt(dayEaten.kcal)} из {fmt(tg.kcal)} ккал по записанному</Txt>
       </View>
 
       <View style={styles.macros}>
-        <MacroCard macro="protein" grams={dayEaten.protein} target={t.protein} />
-        <MacroCard macro="carbs" grams={dayEaten.carbs} target={t.carbs} />
-        <MacroCard macro="fat" grams={dayEaten.fat} target={t.fat} />
+        <MacroCard macro="protein" grams={dayEaten.protein} target={tg.protein} />
+        <MacroCard macro="carbs" grams={dayEaten.carbs} target={tg.carbs} />
+        <MacroCard macro="fat" grams={dayEaten.fat} target={tg.fat} />
       </View>
 
       <View style={{ gap: space[3] }}>
         <View style={styles.sectionHead}>
-          <Txt variant="title" style={{ fontSize: 20, lineHeight: 26 }}>Приёмы пищи</Txt>
+          <Txt variant="title" style={{ fontSize: 20, lineHeight: 26 }}>{t('Приёмы пищи')}</Txt>
           <Pressable accessibilityRole="button" onPress={addManual} hitSlop={8}>
-            <Txt variant="headline" style={{ fontSize: 15, color: c.accentText }}>+ Без фото</Txt>
+            <Txt variant="headline" style={{ fontSize: 15, color: c.accentText }}>{t('+ Без фото')}</Txt>
           </Pressable>
         </View>
         {picked && loaded && meals.length === 0 && (
           <View style={[styles.empty, { backgroundColor: c.surface }]}>
             <Txt variant="headline" center>За {label} записей нет</Txt>
-            <Txt variant="caption" tone="muted" center>Забыли сфотографировать? Добавьте еду вручную — посчитаем по базе.</Txt>
-            <Button title="Добавить без фото" variant="secondary" onPress={addManual} />
+            <Txt variant="caption" tone="muted" center>{t('Забыли сфотографировать? Добавьте еду вручную — посчитаем по базе.')}</Txt>
+            <Button title={t('Добавить без фото')} variant="secondary" onPress={addManual} />
           </View>
         )}
         {!picked && loaded && meals.length === 0 && (
           <View style={[styles.empty, { backgroundColor: c.surface }]}>
             <MascotSlot stage={streak?.stage ?? 1} size={96} />
-            <Txt variant="headline" center>Сегодня пока пусто</Txt>
-            <Txt variant="caption" tone="muted" center>Сфотографируйте первый приём пищи — разбор придёт сразу, а нутрициолог проверит его в течение 15 минут.</Txt>
-            <Button title="Сфотографировать" variant="accent" onPress={() => router.push('/camera')} />
+            <Txt variant="headline" center>{t('Сегодня пока пусто')}</Txt>
+            <Txt variant="caption" tone="muted" center>{t('Сфотографируйте первый приём пищи — разбор придёт сразу, а нутрициолог проверит его в течение 15 минут.')}</Txt>
+            <Button title={t('Сфотографировать')} variant="accent" onPress={() => router.push('/camera')} />
           </View>
         )}
         {meals.map((m) => {

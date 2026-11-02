@@ -17,6 +17,7 @@ import { WEEKDAYS_SHORT, daysWord } from '@/lib/dates';
 import { GOALS, mealFromServer, mealNutrients, useAppStore } from '@/store/app-store';
 import { font, radius, space } from '@/theme/tokens';
 import { useColors } from '@/theme/use-colors';
+import { t } from '@/lib/i18n';
 
 const BAR_H = 64;
 
@@ -62,7 +63,7 @@ export default function Student() {
   if (!card) {
     return (
       <Screen>
-        <RoundButton icon="back" label="Назад" onPress={() => router.back()} />
+        <RoundButton icon="back" label={t('Назад')} onPress={() => router.back()} />
         {error ? <Txt tone="warning">{error}</Txt> : <ActivityIndicator color={c.ink} />}
       </Screen>
     );
@@ -83,7 +84,7 @@ export default function Student() {
 
   return (
     <Screen>
-      <RoundButton icon="back" label="Назад" onPress={() => router.back()} />
+      <RoundButton icon="back" label={t('Назад')} onPress={() => router.back()} />
       <View style={{ gap: 2 }}>
         <Txt variant="caption" tone="muted">{goal?.title ?? 'Цель не выбрана'}</Txt>
         <Txt variant="title" style={{ fontFamily: font.extrabold, fontSize: 28, lineHeight: 34 }}>{card.label}</Txt>
@@ -92,7 +93,7 @@ export default function Student() {
 
       <View style={[styles.box, { backgroundColor: c.surface }]}>
         <View style={styles.row}>
-          <Txt variant="headline" style={{ fontSize: 15 }}>Неделя</Txt>
+          <Txt variant="headline" style={{ fontSize: 15 }}>{t('Неделя')}</Txt>
           <Txt variant="caption" tone="muted">
             серия {card.streak.days} {daysWord(card.streak.days)} · в среднем {card.week.avg_kcal ? `${fmt(card.week.avg_kcal)} ккал` : '—'}
           </Txt>
@@ -115,7 +116,7 @@ export default function Student() {
       <WeightCard data={card.weights} readOnly />
 
       <View style={[styles.box, { backgroundColor: c.surface }]}>
-        <Txt variant="headline" style={{ fontSize: 15 }}>Ориентир на день</Txt>
+        <Txt variant="headline" style={{ fontSize: 15 }}>{t('Ориентир на день')}</Txt>
         <Txt variant="caption" tone="muted">
           {card.targets.set_by_pro
             ? `Задан вами: ${fmt(card.targets.kcal)} ккал. Белок ${card.targets.protein} г.`
@@ -124,44 +125,44 @@ export default function Student() {
         <View style={[styles.kcal, { backgroundColor: c.bg }]}>
           <TextInput value={kcal} onChangeText={(v) => setKcal(v.replace(/\D/g, '').slice(0, 4))}
             placeholder={String(card.targets.kcal)} placeholderTextColor={c.muted} keyboardType="number-pad"
-            accessibilityLabel="Калории в день" style={[styles.kcalInput, { color: c.ink }]} />
+            accessibilityLabel={t('Калории в день')} style={[styles.kcalInput, { color: c.ink }]} />
           <Txt variant="caption" tone="muted">ккал в день</Txt>
         </View>
         <View style={styles.row}>
-          <Button title="Задать" variant="accent" disabled={kcalNum < 1000 || kcalNum > 5000}
+          <Button title={t('Задать')} variant="accent" disabled={kcalNum < 1000 || kcalNum > 5000}
             onPress={() => run('target', () => setStudentTarget(sid, kcalNum))} />
           {card.targets.set_by_pro && (
-            <Button title="Вернуть расчёт" variant="secondary" onPress={() => run('target', () => setStudentTarget(sid, null))} />
+            <Button title={t('Вернуть расчёт')} variant="secondary" onPress={() => run('target', () => setStudentTarget(sid, null))} />
           )}
         </View>
         {saved === 'target' && <Txt variant="caption" tone="accent">Сохранено — {whom} видит новый ориентир.</Txt>}
       </View>
 
       <View style={[styles.box, { backgroundColor: c.surface }]}>
-        <Txt variant="headline" style={{ fontSize: 15 }}>Итог недели</Txt>
+        <Txt variant="headline" style={{ fontSize: 15 }}>{t('Итог недели')}</Txt>
         <Txt variant="caption" tone="muted">{whom === 'клиент' ? 'Клиент' : 'Ученик'} увидит его в «Прогрессе». Пустой — покажем последний комментарий к фото.</Txt>
-        <TextInput value={comment} onChangeText={setComment} multiline placeholder="Что получилось, что поправить на следующей неделе"
-          placeholderTextColor={c.muted} accessibilityLabel="Итог недели"
+        <TextInput value={comment} onChangeText={setComment} multiline placeholder={t('Что получилось, что поправить на следующей неделе')}
+          placeholderTextColor={c.muted} accessibilityLabel={t('Итог недели')}
           style={[styles.area, { backgroundColor: c.bg, color: c.ink }]} />
-        <Button title="Отправить итог" variant="accent" onPress={() => run('comment', () => setWeekComment(sid, comment))} />
-        {saved === 'comment' && <Txt variant="caption" tone="accent">Отправлено.</Txt>}
+        <Button title={t('Отправить итог')} variant="accent" onPress={() => run('comment', () => setWeekComment(sid, comment))} />
+        {saved === 'comment' && <Txt variant="caption" tone="accent">{t('Отправлено.')}</Txt>}
       </View>
 
       <View style={[styles.box, { backgroundColor: c.surface }]}>
-        <Txt variant="headline" style={{ fontSize: 15 }}>Заметка</Txt>
-        <Txt variant="caption" tone="muted">Видите только вы: ограничения, договорённости, что важно помнить.</Txt>
-        <TextInput value={note} onChangeText={setNote} multiline placeholder="Например: не ест после 20:00, аллергия на орехи"
-          placeholderTextColor={c.muted} accessibilityLabel="Заметка"
+        <Txt variant="headline" style={{ fontSize: 15 }}>{t('Заметка')}</Txt>
+        <Txt variant="caption" tone="muted">{t('Видите только вы: ограничения, договорённости, что важно помнить.')}</Txt>
+        <TextInput value={note} onChangeText={setNote} multiline placeholder={t('Например: не ест после 20:00, аллергия на орехи')}
+          placeholderTextColor={c.muted} accessibilityLabel={t('Заметка')}
           style={[styles.area, { backgroundColor: c.bg, color: c.ink }]} />
-        <Button title="Сохранить заметку" variant="secondary" onPress={() => run('note', () => setStudentNote(sid, note))} />
-        {saved === 'note' && <Txt variant="caption" tone="accent">Сохранено.</Txt>}
+        <Button title={t('Сохранить заметку')} variant="secondary" onPress={() => run('note', () => setStudentNote(sid, note))} />
+        {saved === 'note' && <Txt variant="caption" tone="accent">{t('Сохранено.')}</Txt>}
       </View>
 
       {error && <Txt variant="caption" tone="warning">{error}</Txt>}
 
       <View style={{ gap: space[3] }}>
-        <Txt variant="title" style={{ fontSize: 20, lineHeight: 26 }}>Приёмы пищи за 2 недели</Txt>
-        {card.meals.length === 0 && <Txt variant="caption" tone="muted">Пока нет записей.</Txt>}
+        <Txt variant="title" style={{ fontSize: 20, lineHeight: 26 }}>{t('Приёмы пищи за 2 недели')}</Txt>
+        {card.meals.length === 0 && <Txt variant="caption" tone="muted">{t('Пока нет записей.')}</Txt>}
         {card.meals.map((sm) => {
           const m = mealFromServer(sm);
           const n = mealNutrients(m.items);

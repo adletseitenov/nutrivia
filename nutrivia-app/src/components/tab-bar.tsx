@@ -6,6 +6,7 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { font } from '@/theme/tokens';
 import { useColors } from '@/theme/use-colors';
+import { t } from '@/lib/i18n';
 
 import { Icon, type IconName } from './icon';
 import { Txt } from './txt';
@@ -29,7 +30,7 @@ export function TabBar({ state, navigateToTab }: BottomTabBarProps) {
             <View key={route.key} style={styles.item}>
               <Pressable
                 accessibilityRole="button"
-                accessibilityLabel="Сфотографировать еду"
+                accessibilityLabel={t('Сфотографировать еду')}
                 onPress={() => {
                   Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
                   router.push('/camera');
@@ -54,7 +55,7 @@ export function TabBar({ state, navigateToTab }: BottomTabBarProps) {
             }}
             style={styles.item}>
             <Icon name={tab.icon} color={color} />
-            <Txt style={{ color, fontFamily: focused ? font.semibold : font.medium, fontSize: 11, lineHeight: 14 }}>{tab.label}</Txt>
+            <Txt style={{ color, fontFamily: focused ? font.semibold : font.medium, fontSize: 11, lineHeight: 14 }}>{t(tab.label)}</Txt>
           </Pressable>
         );
       })}

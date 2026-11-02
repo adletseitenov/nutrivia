@@ -8,6 +8,7 @@ import { Screen } from '@/components/screen';
 import { TextField } from '@/components/text-field';
 import { Txt } from '@/components/txt';
 import { useAppStore } from '@/store/app-store';
+import { t } from '@/lib/i18n';
 
 /** Ввод кода тренера или нутрициолога после регистрации (из профиля). */
 export default function Join() {
@@ -29,14 +30,14 @@ export default function Join() {
 
   return (
     <Screen footer={<Button title={busy ? 'Проверяем…' : 'Подключиться'} block disabled={code.length < 4 || busy} onPress={submit} />}>
-      <RoundButton icon="back" label="Назад" onPress={() => router.back()} />
-      <Txt variant="display">Код тренера или нутрициолога</Txt>
-      <Txt tone="muted">После подключения специалист увидит ваши калории и серию. Ваше имя и телефон он не видит.</Txt>
+      <RoundButton icon="back" label={t('Назад')} onPress={() => router.back()} />
+      <Txt variant="display">{t('Код тренера или нутрициолога')}</Txt>
+      <Txt tone="muted">{t('После подключения специалист увидит ваши калории и серию. Ваше имя и телефон он не видит.')}</Txt>
       <TextField
-        label="Код"
+        label={t('Код')}
         value={code}
         onChangeText={(v) => { setCode(v.replace(/\s/g, '').toLowerCase()); setError(null); }}
-        placeholder="Например, k7m2px"
+        placeholder={t('Например, k7m2px')}
         autoCapitalize="none"
         autoCorrect={false}
         autoFocus

@@ -4,6 +4,7 @@ import Svg, { Circle } from 'react-native-svg';
 import { fmt } from '@/engine/engine';
 import { radius, space } from '@/theme/tokens';
 import { useColors } from '@/theme/use-colors';
+import { t } from '@/lib/i18n';
 
 import { Txt } from './txt';
 
@@ -55,7 +56,7 @@ export function MacroCard({ macro, grams, target }: { macro: Macro; grams: numbe
         <Txt variant="caption" tone="muted" numberOfLines={1}>из {fmt(target)} г</Txt>
       </View>
       <Arc size={44} stroke={5} value={grams / target} color={color} track={c.track} />
-      <Txt variant="caption" tone="muted">{MACRO[macro]}</Txt>
+      <Txt variant="caption" tone="muted">{t(MACRO[macro])}</Txt>
     </View>
   );
 }

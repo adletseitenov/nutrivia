@@ -10,6 +10,7 @@ import { Txt } from '@/components/txt';
 import { useAppStore } from '@/store/app-store';
 import { radius, space } from '@/theme/tokens';
 import { useColors } from '@/theme/use-colors';
+import { t } from '@/lib/i18n';
 
 const ROLES: { id: Role; title: string; sub: string }[] = [
   { id: 'client', title: 'Для себя', sub: 'Слежу за своим питанием' },
@@ -27,13 +28,13 @@ export default function RoleScreen() {
     <Screen
       footer={
         <Button
-          title="Продолжить"
+          title={t('Продолжить')}
           block
           onPress={() => router.push(role === 'client' ? '/goal' : '/pro-name')}
         />
       }>
       <View style={styles.head}>
-        <RoundButton icon="back" label="Назад" onPress={() => router.back()} />
+        <RoundButton icon="back" label={t('Назад')} onPress={() => router.back()} />
         <View style={[styles.progress, { backgroundColor: c.track }]}>
           <View style={[styles.progressFill, { backgroundColor: c.ink, width: role === 'client' ? '20%' : '25%' }]} />
         </View>
@@ -41,8 +42,8 @@ export default function RoleScreen() {
       </View>
 
       <View style={{ gap: space[2] }}>
-        <Txt variant="display">Кто вы?</Txt>
-        <Txt tone="muted">От этого зависит, что будет в приложении: свой дневник или кабинет с учениками.</Txt>
+        <Txt variant="display">{t('Кто вы?')}</Txt>
+        <Txt tone="muted">{t('От этого зависит, что будет в приложении: свой дневник или кабинет с учениками.')}</Txt>
       </View>
 
       <View style={{ gap: space[3] }} accessibilityRole="radiogroup">

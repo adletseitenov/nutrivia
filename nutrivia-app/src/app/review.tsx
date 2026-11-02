@@ -16,6 +16,7 @@ import { compute, fmt, getDish, portionCount, portionText } from '@/engine/engin
 import { itemsFromServer, mealNutrients, refreshToday, useAppStore, type MealItem } from '@/store/app-store';
 import { font, radius, space } from '@/theme/tokens';
 import { useColors } from '@/theme/use-colors';
+import { t } from '@/lib/i18n';
 
 type Phase =
   | { kind: 'loading' }
@@ -108,7 +109,7 @@ export default function Review() {
     <View style={{ flex: 1, backgroundColor: c.bg }}>
       <MealPhoto uri={photo} width={width} height={330} />
       <View style={[styles.photoBar, { top: insets.top + space[2] }]}>
-        <RoundButton icon="back" label="Назад" onPress={() => router.back()} />
+        <RoundButton icon="back" label={t('Назад')} onPress={() => router.back()} />
         {phase.kind === 'ready' && <StatusPill status={phase.meal.status === 'reviewed' ? 'reviewed' : 'draft'} />}
       </View>
 
@@ -116,8 +117,8 @@ export default function Review() {
         {phase.kind === 'loading' && (
           <View style={styles.center}>
             <ActivityIndicator color={c.ink} />
-            <Txt variant="headline">Разбираем фото…</Txt>
-            <Txt variant="caption" tone="muted" center>Обычно это занимает 10–20 секунд</Txt>
+            <Txt variant="headline">{t('Разбираем фото…')}</Txt>
+            <Txt variant="caption" tone="muted" center>{t('Обычно это занимает 10–20 секунд')}</Txt>
           </View>
         )}
 
@@ -125,17 +126,17 @@ export default function Review() {
           <View style={styles.center}>
             <Txt variant="headline" center>{phase.message}</Txt>
             <View style={{ flexDirection: 'row', gap: space[3] }}>
-              <Button title="Закрыть" variant="secondary" onPress={() => router.back()} />
-              <Button title="Повторить" onPress={analyze} />
+              <Button title={t('Закрыть')} variant="secondary" onPress={() => router.back()} />
+              <Button title={t('Повторить')} onPress={analyze} />
             </View>
           </View>
         )}
 
         {phase.kind === 'not_food' && (
           <View style={styles.center}>
-            <Txt variant="title" center>Не вижу еды на фото</Txt>
-            <Txt tone="muted" center>Снимите тарелку целиком, сверху и при хорошем свете.</Txt>
-            <Button title="Переснять" onPress={() => router.replace('/camera')} />
+            <Txt variant="title" center>{t('Не вижу еды на фото')}</Txt>
+            <Txt tone="muted" center>{t('Снимите тарелку целиком, сверху и при хорошем свете.')}</Txt>
+            <Button title={t('Переснять')} onPress={() => router.replace('/camera')} />
           </View>
         )}
 
@@ -183,13 +184,13 @@ export default function Review() {
                         </Txt>
                       </View>
                       <View style={[styles.stepper, { backgroundColor: c.bg }]}>
-                        <Pressable accessibilityRole="button" accessibilityLabel="Меньше" onPress={() => step(i, -1)} style={styles.stepBtn}>
+                        <Pressable accessibilityRole="button" accessibilityLabel={t('Меньше')} onPress={() => step(i, -1)} style={styles.stepBtn}>
                           <Icon name="minus" size={18} color={c.ink} strokeWidth={2} />
                         </Pressable>
                         <Txt style={{ fontFamily: font.bold, fontSize: 15, minWidth: 28, textAlign: 'center' }}>
                           {portionCount(it.grams / (dish.unitGrams || 100))}
                         </Txt>
-                        <Pressable accessibilityRole="button" accessibilityLabel="Больше" onPress={() => step(i, 1)} style={styles.stepBtn}>
+                        <Pressable accessibilityRole="button" accessibilityLabel={t('Больше')} onPress={() => step(i, 1)} style={styles.stepBtn}>
                           <Icon name="plus" size={18} color={c.ink} strokeWidth={2} />
                         </Pressable>
                       </View>
@@ -198,7 +199,7 @@ export default function Review() {
                 })}
                 <Pressable accessibilityRole="button" onPress={() => setAdding(true)} style={styles.add}>
                   <Icon name="plus" size={18} color={c.accentText} strokeWidth={2} />
-                  <Txt style={{ fontFamily: font.semibold, fontSize: 15, color: c.accentText }}>Добавить блюдо</Txt>
+                  <Txt style={{ fontFamily: font.semibold, fontSize: 15, color: c.accentText }}>{t('Добавить блюдо')}</Txt>
                 </Pressable>
               </View>
 
@@ -212,7 +213,7 @@ export default function Review() {
               </View>
             </ScrollView>
             <View style={[styles.actions, { paddingBottom: insets.bottom + space[3] }]}>
-              <Button title="Переснять" variant="secondary" style={{ flex: 1 }} onPress={() => router.replace('/camera')} />
+              <Button title={t('Переснять')} variant="secondary" style={{ flex: 1 }} onPress={() => router.replace('/camera')} />
               <Button title={saving ? 'Сохраняем…' : 'Верно'} variant="accent" style={{ flex: 1 }} disabled={saving} onPress={confirm} />
             </View>
           </>

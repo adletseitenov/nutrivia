@@ -14,6 +14,7 @@ import { RoundButton } from '@/components/round-button';
 import { Txt } from '@/components/txt';
 import { FEATURES } from '@/lib/features';
 import { font, space } from '@/theme/tokens';
+import { t } from '@/lib/i18n';
 
 type Mode = 'food' | 'fridge';
 
@@ -63,9 +64,9 @@ export default function Camera() {
         ) : null}
         {needPermission && (
           <View style={styles.permission}>
-            <Txt variant="headline" tone="onInk" center style={{ color: '#FFFFFF' }}>Нужен доступ к камере</Txt>
-            <Txt variant="caption" center style={{ color: 'rgba(255,255,255,0.7)' }}>Фото еды видите только вы и ваш нутрициолог.</Txt>
-            <Button title="Разрешить" variant="accent" onPress={requestPermission} />
+            <Txt variant="headline" tone="onInk" center style={{ color: '#FFFFFF' }}>{t('Нужен доступ к камере')}</Txt>
+            <Txt variant="caption" center style={{ color: 'rgba(255,255,255,0.7)' }}>{t('Фото еды видите только вы и ваш нутрициолог.')}</Txt>
+            <Button title={t('Разрешить')} variant="accent" onPress={requestPermission} />
           </View>
         )}
         <View pointerEvents="none" style={[styles.frame, { width: frame, height: frame, left: 35, top: 35 }]}>
@@ -77,9 +78,9 @@ export default function Camera() {
       </View>
 
       <View style={[styles.top, { top: insets.top + space[2] }]}>
-        <RoundButton icon="close" label="Закрыть камеру" tone="glass" onPress={() => router.back()} />
+        <RoundButton icon="close" label={t('Закрыть камеру')} tone="glass" onPress={() => router.back()} />
         <Txt variant="headline" style={{ color: '#FFFFFF', fontSize: 15 }}>{copy.title}</Txt>
-        <RoundButton icon="flash" label="Вспышка" tone="glass" />
+        <RoundButton icon="flash" label={t('Вспышка')} tone="glass" />
       </View>
 
       <View style={[styles.bottom, { paddingBottom: insets.bottom + space[5] }]}>
@@ -109,13 +110,13 @@ export default function Camera() {
         )}
 
         <View style={styles.controls}>
-          <Pressable accessibilityRole="button" accessibilityLabel="Выбрать из галереи" onPress={pick} style={styles.side}>
+          <Pressable accessibilityRole="button" accessibilityLabel={t('Выбрать из галереи')} onPress={pick} style={styles.side}>
             <Icon name="image" color="#FFFFFF" />
           </Pressable>
-          <Pressable accessibilityRole="button" accessibilityLabel="Сделать снимок" onPress={shoot} style={({ pressed }) => [styles.shutter, { transform: [{ scale: pressed ? 0.94 : 1 }] }]}>
+          <Pressable accessibilityRole="button" accessibilityLabel={t('Сделать снимок')} onPress={shoot} style={({ pressed }) => [styles.shutter, { transform: [{ scale: pressed ? 0.94 : 1 }] }]}>
             <View style={styles.shutterInner} />
           </Pressable>
-          <Pressable accessibilityRole="button" accessibilityLabel="Ввести вручную" onPress={() => router.replace('/manual')} style={styles.side}>
+          <Pressable accessibilityRole="button" accessibilityLabel={t('Ввести вручную')} onPress={() => router.replace('/manual')} style={styles.side}>
             <Icon name="edit" color="#FFFFFF" />
           </Pressable>
         </View>
