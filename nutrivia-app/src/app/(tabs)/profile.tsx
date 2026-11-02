@@ -1,7 +1,7 @@
 import { router } from 'expo-router';
 import { Pressable, StyleSheet, View } from 'react-native';
 
-import { deleteMe, logout } from '@/api/client';
+import { bodyFromMe, deleteMe, logout } from '@/api/client';
 import { Icon } from '@/components/icon';
 import { Screen } from '@/components/screen';
 import { Txt } from '@/components/txt';
@@ -15,10 +15,16 @@ export default function Profile() {
   const { state, dispatch } = useAppStore();
   const t = useTargets();
   const goal = GOALS.find((g) => g.id === state.goal)!;
+  const body = bodyFromMe(state.me);
 
   const rows: { label: string; value: string; onPress?: () => void }[] = [
     { label: 'Цель', value: goal.title, onPress: () => router.push('/goal') },
-    { label: 'Ориентир на день', value: `${fmt(t.kcal)} ккал` },
+    {
+      label: 'Параметры',
+      value: body ? `${body.heightCm} см · ${body.weightKg} кг` : 'Указать',
+      onPress: () => router.push('/body'),
+    },
+    { label: 'Ориентир на день', value: `${fmt(t.kcal)} ккал${state.me?.targets?.set_by_pro ? ' · от специалиста' : ''}` },
     state.me?.coach
       ? { label: 'Тренер или нутрициолог', value: state.me.coach.name }
       : { label: 'Тренер или нутрициолог', value: 'Ввести код', onPress: () => router.push('/join') },

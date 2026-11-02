@@ -3,7 +3,7 @@ import { router, useLocalSearchParams } from 'expo-router';
 import { useEffect, useRef, useState, type ComponentRef } from 'react';
 import { Alert, Platform, Pressable, StyleSheet, TextInput, View } from 'react-native';
 
-import { ApiError, smsStart, smsVerify } from '@/api/client';
+import { ApiError, patchBody, smsStart, smsVerify } from '@/api/client';
 import { RoundButton } from '@/components/round-button';
 import { Screen } from '@/components/screen';
 import { Txt } from '@/components/txt';
@@ -51,11 +51,15 @@ export default function Code() {
       const signup = mode === 'login' ? { role: 'client' as const } : { ...state.signup, goal: state.goal };
       const r = await smsVerify(phone, value, signup);
       Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
-      dispatch({ type: 'setMe', me: r.me });
+      let me = r.me;
+      if (r.is_new && state.signup.body && me.role === 'client') {
+        me = await patchBody(state.signup.body).catch(() => me); // не вышло — человек допишет в профиле
+      }
+      dispatch({ type: 'setMe', me });
       dispatch({ type: 'finishOnboarding' });
       refreshToday(dispatch);
       router.dismissAll();
-      router.replace(r.me.pro ? '/pro' : '/today');
+      router.replace(me.pro ? '/pro' : '/today');
       if (r.join_message) {
         if (Platform.OS === 'web') window.alert(`Код не подошёл\n${r.join_message}`);
         else Alert.alert('Код не подошёл', r.join_message);

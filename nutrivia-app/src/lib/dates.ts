@@ -8,6 +8,11 @@ export function todayTitle(d = new Date()) {
   return `${WEEKDAYS[(d.getDay() + 6) % 7]}, ${d.getDate()} ${MONTHS_GEN[d.getMonth()]}`;
 }
 
+/** «2026-11-04» → «4 ноября» (родительный падеж — «в 4 ноября» не говорим, «за 4 ноября» — да) */
+export function dayLabel(iso: string) {
+  return `${dayOfMonth(iso)} ${MONTHS_GEN[Number(iso.slice(5, 7)) - 1]}`;
+}
+
 /** «2026-11-04» → день месяца */
 export function dayOfMonth(iso: string) {
   return Number(iso.slice(8, 10));

@@ -1,16 +1,17 @@
 import { router, useFocusEffect } from 'expo-router';
-import { useCallback } from 'react';
+import { useCallback, useState } from 'react';
 import { Pressable, StyleSheet, View } from 'react-native';
 
+import { getToday, type ServerToday } from '@/api/client';
 import { Button } from '@/components/button';
 import { MascotSlot } from '@/components/mascot-slot';
 import { MealCard } from '@/components/meal-card';
 import { CalorieRing, MacroCard } from '@/components/rings';
 import { Screen } from '@/components/screen';
 import { Txt } from '@/components/txt';
-import { fmt } from '@/engine/engine';
-import { dayOfMonth, daysWord, todayTitle, WEEKDAYS_SHORT } from '@/lib/dates';
-import { mealNutrients, refreshToday, useAppStore, useTargets, useToday } from '@/store/app-store';
+import { add, fmt, ZERO } from '@/engine/engine';
+import { dayLabel, dayOfMonth, daysWord, todayTitle, WEEKDAYS_SHORT } from '@/lib/dates';
+import { mealFromServer, mealNutrients, refreshToday, useAppStore, useTargets, useToday } from '@/store/app-store';
 import { font, radius, space } from '@/theme/tokens';
 import { useColors } from '@/theme/use-colors';
 
@@ -21,20 +22,36 @@ export default function Today() {
   const eaten = useToday();
   const streak = state.progress?.streak;
   const week = state.progress?.week.days ?? [];
+  // Выбранный прошлый день из полосы; null — сегодня (он живёт в сторе и обновляется сам)
+  const [picked, setPicked] = useState<string | null>(null);
+  const [past, setPast] = useState<ServerToday | null>(null);
 
   // Свежий день с сервера при каждом открытии вкладки (статусы разборов, правки нутрициолога)
   useFocusEffect(
     useCallback(() => {
       refreshToday(dispatch);
-    }, [dispatch]),
+      if (picked) getToday(picked).then(setPast, () => {});
+    }, [dispatch, picked]),
   );
+
+  function pickDay(date: string, isToday: boolean) {
+    setPast(null);
+    setPicked(isToday ? null : date);
+    if (!isToday) getToday(date).then(setPast, () => {});
+  }
+
+  const meals = picked ? (past?.meals ?? []).map(mealFromServer) : state.meals;
+  const dayEaten = picked ? meals.reduce((acc, m) => add(acc, mealNutrients(m.items)), ZERO) : eaten;
+  const loaded = picked ? !!past : state.loaded;
+  const label = picked ? dayLabel(picked) : null;
+  const addManual = () => router.push(picked ? { pathname: '/manual', params: { date: picked, label } } : '/manual');
 
   return (
     <Screen tabs>
       <View style={styles.head}>
         <View>
-          <Txt variant="caption" tone="muted">{todayTitle()}</Txt>
-          <Txt variant="title" style={{ fontFamily: font.extrabold, fontSize: 28, lineHeight: 34 }}>Сегодня</Txt>
+          <Txt variant="caption" tone="muted">{picked ? 'Записи за день' : todayTitle()}</Txt>
+          <Txt variant="title" style={{ fontFamily: font.extrabold, fontSize: 28, lineHeight: 34 }}>{label ?? 'Сегодня'}</Txt>
         </View>
         <Pressable
           accessibilityRole="button"
@@ -53,38 +70,54 @@ export default function Today() {
 
       <View style={styles.week}>
         {week.map((d, i) => {
-          const today = i === week.length - 1;
-          const fg = today ? c.onInk : c.ink;
+          const isToday = i === week.length - 1;
+          const on = picked ? d.date === picked : isToday;
+          const fg = on ? c.onInk : c.ink;
           // Зелёная точка — день засчитан в серию, серая — есть фото, но меньше нормы
           const counted = d.meals >= (streak?.min_photos ?? 2);
           const dot = counted ? c.green : d.meals ? c.muted : 'transparent';
           return (
-            <View key={d.date} style={[styles.day, today && { backgroundColor: c.ink }]}>
+            <Pressable
+              key={d.date}
+              accessibilityRole="button"
+              accessibilityState={{ selected: on }}
+              accessibilityLabel={isToday ? 'Сегодня' : dayLabel(d.date)}
+              onPress={() => pickDay(d.date, isToday)}
+              style={[styles.day, on && { backgroundColor: c.ink }]}>
               <Txt style={{ fontFamily: font.medium, fontSize: 11, lineHeight: 14, color: fg, opacity: 0.7 }}>{WEEKDAYS_SHORT[d.weekday]}</Txt>
               <Txt style={{ fontFamily: font.bold, fontSize: 15, lineHeight: 20, color: fg }}>{dayOfMonth(d.date)}</Txt>
               <View style={[styles.dayDot, { backgroundColor: dot }]} />
-            </View>
+            </Pressable>
           );
         })}
       </View>
 
       <View style={[styles.ringCard, { backgroundColor: c.surface }]}>
-        <CalorieRing consumed={eaten.kcal} target={t.kcal} />
-        <Txt variant="caption" tone="muted">Съедено {fmt(eaten.kcal)} из {fmt(t.kcal)} ккал по записанному</Txt>
+        <CalorieRing consumed={dayEaten.kcal} target={t.kcal} />
+        <Txt variant="caption" tone="muted">Съедено {fmt(dayEaten.kcal)} из {fmt(t.kcal)} ккал по записанному</Txt>
       </View>
 
       <View style={styles.macros}>
-        <MacroCard macro="protein" grams={eaten.protein} target={t.protein} />
-        <MacroCard macro="carbs" grams={eaten.carbs} target={t.carbs} />
-        <MacroCard macro="fat" grams={eaten.fat} target={t.fat} />
+        <MacroCard macro="protein" grams={dayEaten.protein} target={t.protein} />
+        <MacroCard macro="carbs" grams={dayEaten.carbs} target={t.carbs} />
+        <MacroCard macro="fat" grams={dayEaten.fat} target={t.fat} />
       </View>
 
       <View style={{ gap: space[3] }}>
         <View style={styles.sectionHead}>
           <Txt variant="title" style={{ fontSize: 20, lineHeight: 26 }}>Приёмы пищи</Txt>
-          {state.meals.length > 0 && <Txt variant="caption" tone="muted">{state.meals.length} за сегодня</Txt>}
+          <Pressable accessibilityRole="button" onPress={addManual} hitSlop={8}>
+            <Txt variant="headline" style={{ fontSize: 15, color: c.greenText }}>+ Без фото</Txt>
+          </Pressable>
         </View>
-        {state.loaded && state.meals.length === 0 && (
+        {picked && loaded && meals.length === 0 && (
+          <View style={[styles.empty, { backgroundColor: c.surface }]}>
+            <Txt variant="headline" center>За {label} записей нет</Txt>
+            <Txt variant="caption" tone="muted" center>Забыли сфотографировать? Добавьте еду вручную — посчитаем по базе.</Txt>
+            <Button title="Добавить без фото" variant="secondary" onPress={addManual} />
+          </View>
+        )}
+        {!picked && loaded && meals.length === 0 && (
           <View style={[styles.empty, { backgroundColor: c.surface }]}>
             <MascotSlot stage={streak?.stage ?? 1} size={96} />
             <Txt variant="headline" center>Сегодня пока пусто</Txt>
@@ -92,7 +125,7 @@ export default function Today() {
             <Button title="Сфотографировать" variant="accent" onPress={() => router.push('/camera')} />
           </View>
         )}
-        {state.meals.map((m) => {
+        {meals.map((m) => {
           const n = mealNutrients(m.items);
           return (
             <MealCard

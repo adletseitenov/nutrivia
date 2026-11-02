@@ -457,3 +457,87 @@ def test_serves_web_app(tmp_path, monkeypatch):
         assert c.get("/health").json() == {"ok": True}  # API не перекрыт
         assert c.get("/v1/me").status_code == 401
         assert c.get("/v1/nope").status_code == 404
+
+
+def test_profile_sets_personal_targets(client):
+    h, out = login(client)
+    assert out["me"]["targets"] == {"kcal": 1600, "protein": 90, "set_by_pro": False}
+    body = {"sex": "f", "birth_year": 1996, "height_cm": 165, "weight_kg": 70, "activity": "light"}
+    me = client.patch("/v1/me", headers=h, json=body).json()
+    assert me["profile"]["weight_kg"] == 70 and me["targets"]["kcal"] in (1650, 1600, 1700)
+    assert client.get("/v1/today", headers=h).json()["targets"]["kcal"] == me["targets"]["kcal"]
+    # цель можно менять отдельно, параметры остаются
+    assert client.patch("/v1/me", headers=h, json={"goal": "even"}).json()["profile"]["sex"] == "f"
+    r = client.patch("/v1/me", headers=h, json={"birth_year": 2015})
+    assert r.status_code == 400 and r.json()["code"] == "under_18"
+    assert client.patch("/v1/me", headers=h, json={"height_cm": 20}).status_code == 422
+
+
+def test_manual_meal_past_day_and_delete(client):
+    h = register(client)
+    r = client.post("/v1/meals/manual", headers=h, json={"items": [{"dish_id": "oatmeal", "grams": 250}]})
+    assert r.status_code == 200, r.text
+    m = r.json()
+    assert m["status"] == "manual" and m["items"][0]["kcal"] > 0 and not m["has_photo"]
+    # не идёт в серию фото
+    assert client.get("/v1/progress", headers=h).json()["streak"]["photos_today"] == 0
+    # вчерашний день
+    from datetime import datetime, timedelta
+    from nutrivia.config import ALMATY
+    yday = (datetime.fromtimestamp(time.time(), ALMATY) - timedelta(days=1)).date().isoformat()
+    y = client.post("/v1/meals/manual", headers=h, json={"items": [{"dish_id": "plov", "grams": 300}], "date": yday}).json()
+    day = client.get(f"/v1/today?date={yday}", headers=h).json()
+    assert [x["id"] for x in day["meals"]] == [y["id"]]
+    assert [x["id"] for x in client.get("/v1/today", headers=h).json()["meals"]] == [m["id"]]
+    # слишком давно и неизвестное блюдо — нельзя
+    assert client.post("/v1/meals/manual", headers=h, json={"items": [{"dish_id": "plov", "grams": 300}], "date": "2020-01-01"}).status_code == 422
+    assert client.post("/v1/meals/manual", headers=h, json={"items": [{"dish_id": "nope", "grams": 300}]}).status_code == 422
+    # удалить можно только своё
+    other = register(client, phone="+77070000009")
+    assert client.delete(f"/v1/meals/{m['id']}", headers=other).status_code == 404
+    assert client.delete(f"/v1/meals/{m['id']}", headers=h).status_code == 204
+    assert client.get(f"/v1/meals/{m['id']}", headers=h).status_code == 404
+
+
+def test_delete_photo_meal_removes_file(client, tmp_path):
+    h = register(client)
+    meal = upload(client, h).json()
+    files = list((tmp_path / "p").glob("*"))
+    assert len(files) == 1
+    assert client.delete(f"/v1/meals/{meal['id']}", headers=h).status_code == 204
+    assert list((tmp_path / "p").glob("*")) == []
+
+
+def test_operator_reviews_clients_without_coach(client):
+    h_solo = register(client, phone="+77070000011")
+    h_pro, pro = login(client, phone="+77070000012", role="trainer", name="Ерлан")
+    h_student = register(client, phone="+77070000013", invite_code=pro["me"]["pro"]["invite_code"])
+    h_op, op = login(client, phone="+77070000014")
+    db = client.app.state.svc.db
+    client.portal.call(db.execute, "UPDATE users SET role = 'operator' WHERE tg_id = ?", (op["me"]["user_id"],))
+
+    solo_meal = upload(client, h_solo).json()
+    student_meal = upload(client, h_student).json()
+
+    me = client.get("/v1/me", headers=h_op).json()
+    assert me["pro"]["operator"] is True and me["pro"]["invite_code"] is None
+    queue = client.get("/v1/pro/queue", headers=h_op).json()["meals"]
+    assert [m["id"] for m in queue] == [solo_meal["id"]]  # ученик тренера — пока у тренера
+    assert queue[0]["student"] == "Клиент 1"
+    assert client.get(f"/v1/pro/meals/{student_meal['id']}", headers=h_op).status_code == 404
+    # клиенты оператора — только без тренера
+    assert [s["label"] for s in client.get("/v1/pro/students", headers=h_op).json()["students"]] == ["Клиент 1"]
+
+    # через 15 минут непроверенный разбор ученика тоже виден оператору
+    client.portal.call(db.execute, "UPDATE meals SET received_at = received_at - 1000 WHERE id = ?", (student_meal["id"],))
+    ids = [m["id"] for m in client.get("/v1/pro/queue", headers=h_op).json()["meals"]]
+    assert student_meal["id"] in ids
+
+    # оператор проверяет — клиент видит «Нутрициолог Nutrivia»
+    items = [{"dish_id": i["dish_id"], "grams": i["grams"]} for i in solo_meal["items"] if i["dish_id"]]
+    assert client.put(f"/v1/pro/meals/{solo_meal['id']}/items", headers=h_op, json={"items": items}).status_code == 200
+    assert client.post(f"/v1/pro/meals/{solo_meal['id']}/send", headers=h_op).status_code == 200
+    seen = client.get(f"/v1/meals/{solo_meal['id']}", headers=h_solo).json()
+    assert seen["status"] == "reviewed" and seen["reviewer"] == {"name": "Нутрициолог Nutrivia", "role": "operator"}
+    # обычный клиент в кабинет не попадает
+    assert client.get("/v1/pro/queue", headers=h_solo).status_code == 403

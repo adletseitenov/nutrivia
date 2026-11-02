@@ -10,6 +10,7 @@ import { File } from 'expo-file-system';
 import * as SecureStore from 'expo-secure-store';
 import { Platform } from 'react-native';
 
+import type { Activity, Body } from '@/engine/targets';
 import type { Goal } from '@/store/app-store';
 
 const WEB = Platform.OS === 'web';
@@ -44,7 +45,7 @@ export type ServerItem = {
 
 export type ServerMeal = {
   id: number;
-  status: 'draft' | 'reviewed' | 'not_food';
+  status: 'draft' | 'reviewed' | 'not_food' | 'manual';
   received_at?: number;
   items: ServerItem[];
   comment?: string | null;
@@ -91,7 +92,11 @@ export type Me = {
   goal: string | null;
   lang: string;
   coach: { name: string; code: string } | null;
-  pro?: { name: string; invite_code: string; students: number; limit: number | null };
+  /** operator — команда Nutrivia: клиенты без тренера и просроченные разборы, кода приглашения нет */
+  pro?: { name: string; invite_code: string | null; students: number; limit: number | null; operator?: boolean };
+  profile?: { sex: 'f' | 'm' | null; birth_year: number | null; height_cm: number | null; weight_kg: number | null; activity: Activity | null };
+  /** set_by_pro — ориентир задал нутрициолог, параметры его не меняют */
+  targets?: { kcal: number; protein: number; set_by_pro: boolean };
 };
 
 export type Student = {
@@ -234,6 +239,19 @@ export const getMe = () => request<Me>('/v1/me');
 export const patchGoal = (goal: Goal) =>
   request<Me>('/v1/me', { method: 'PATCH', ...json({ goal: goal === 'coach' ? 'coach_plan' : goal }) });
 
+/** Параметры для личной нормы калорий. */
+export const patchBody = (b: Body) =>
+  request<Me>('/v1/me', {
+    method: 'PATCH',
+    ...json({ sex: b.sex, birth_year: b.birthYear, height_cm: b.heightCm, weight_kg: b.weightKg, activity: b.activity }),
+  });
+
+export function bodyFromMe(me: Me | null): Body | null {
+  const p = me?.profile;
+  if (!p?.sex || !p.birth_year || !p.height_cm || !p.weight_kg || !p.activity) return null;
+  return { sex: p.sex, birthYear: p.birth_year, heightCm: p.height_cm, weightKg: p.weight_kg, activity: p.activity };
+}
+
 export const joinCoach = (inviteCode: string) => request<Me>('/v1/me/coach', { method: 'POST', ...json({ invite_code: inviteCode }) });
 
 export const getQueue = () => request<{ meals: ProMeal[] }>('/v1/pro/queue');
@@ -276,7 +294,14 @@ export async function uploadMeal(uri: string) {
 
 export const getMeal = (id: number) => request<ServerMeal>(`/v1/meals/${id}`);
 
-export const getToday = () => request<ServerToday>('/v1/today');
+/** День по Алматы: без даты — сегодня, иначе «2026-11-01». */
+export const getToday = (date?: string) => request<ServerToday>(date ? `/v1/today?date=${date}` : '/v1/today');
+
+/** Еда без фото из базы блюд; date — дописать в прошлый день (не дальше недели). */
+export const addManualMeal = (items: { dish_id: string; grams: number }[], date?: string) =>
+  request<ServerMeal>('/v1/meals/manual', { method: 'POST', ...json({ items, date }) });
+
+export const deleteMeal = (id: number) => request<void>(`/v1/meals/${id}`, { method: 'DELETE' });
 
 export const getProgress = () => request<ServerProgress>('/v1/progress');
 

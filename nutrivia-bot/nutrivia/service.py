@@ -258,7 +258,7 @@ class Service:
         _, end = local_day_bounds(ts)
         for r in await self.db.fetchall(
                 "SELECT i.dish_id FROM meal_items i JOIN meals m ON m.id = i.meal_id WHERE m.user_id = ?"
-                " AND m.received_at >= ? AND m.received_at < ? AND m.status IN ('sent','confirmed','corrected')"
+                " AND m.received_at >= ? AND m.received_at < ? AND m.status IN ('sent','confirmed','corrected','manual')"
                 " AND i.dish_id IS NOT NULL", (user["tg_id"], start, end)):
             counter[r["dish_id"]] += 1
         return weekly_text(user, days, counter, self.base)
@@ -316,7 +316,7 @@ class Service:
                 "confidence": conf.get(r["raw_name"]), "in_base": dish is not None,
             })
         status = {"received": "draft", "draft": "draft", "sent": "reviewed", "confirmed": "reviewed",
-                  "corrected": "reviewed", "failed": "not_food"}[meal["status"]]
+                  "corrected": "reviewed", "failed": "not_food", "manual": "manual"}[meal["status"]]
         if meal["status"] == "corrected" and not meal["reviewed_at"]:
             status = "draft"
         reviewed = status == "reviewed"
@@ -364,6 +364,39 @@ class Service:
                 await self.db.execute("UPDATE meals SET status = 'corrected' WHERE id = ?", (meal_id,))
         return True
 
+    MANUAL_DAYS_BACK = 7  # вручную можно дописать еду не дальше недели назад
+
+    async def manual_meal(self, user_id: int, items: list[tuple[str, float]], ts: int | None = None) -> int | None:
+        """Еда без фото: человек сам выбрал блюда из базы. Проверка не нужна — в очередь специалиста не идёт
+        и в серию фото не засчитывается. Возвращает id или None, если блюдо не из базы или дата вне недели."""
+        now_ts = self.db.clock()
+        ts = ts or now_ts
+        if ts > now_ts + 60 or ts < local_day_bounds(now_ts, self.MANUAL_DAYS_BACK)[0]:
+            return None
+        new = []
+        for dish_id, grams in items:
+            dish = self.base.get(dish_id)
+            if dish is None or not 0 < grams <= 3000:
+                return None
+            new.append(make_item(dish.name_ru, grams, self.base, self.matcher, dish_id=dish_id))
+        meal_id = await self.db.execute(
+            "INSERT INTO meals (user_id, received_at, status, reviewed_at) VALUES (?, ?, 'manual', NULL)", (user_id, ts))
+        await self.db.replace_items(meal_id, new)
+        await self.db.log_event("manual_meal", user_id, meal_id=meal_id, channel="app")
+        return meal_id
+
+    async def delete_meal(self, meal_id: int, user_id: int) -> bool:
+        """Клиент удаляет свой приём пищи: строки и фото. Метрики (ai_requests, events) остаются без фото."""
+        meal = await self.db.fetchone("SELECT * FROM meals WHERE id = ? AND user_id = ?", (meal_id, user_id))
+        if meal is None:
+            return False
+        if meal["photo_path"]:
+            Path(meal["photo_path"]).unlink(missing_ok=True)
+        await self.db.execute("DELETE FROM meal_items WHERE meal_id = ?", (meal_id,))
+        await self.db.execute("DELETE FROM meals WHERE id = ?", (meal_id,))
+        await self.db.log_event("meal_deleted", user_id, meal_id=meal_id, status=meal["status"])
+        return True
+
     async def app_confirm(self, meal_id: int, user_id: int) -> bool:
         meal = await self.db.fetchone("SELECT * FROM meals WHERE id = ? AND user_id = ?", (meal_id, user_id))
         if meal is None or meal["status"] == "failed":
@@ -403,7 +436,7 @@ class Service:
     async def _photos_by_day(self, user_id: int) -> dict:
         from datetime import datetime
         rows = await self.db.fetchall(
-            "SELECT received_at FROM meals WHERE user_id = ? AND status != 'failed'", (user_id,))
+            "SELECT received_at FROM meals WHERE user_id = ? AND status NOT IN ('failed', 'manual')", (user_id,))
         counts: dict = {}
         for r in rows:
             day = datetime.fromtimestamp(r["received_at"], ALMATY).date()
@@ -536,8 +569,17 @@ class Service:
     async def me_view(self, user_id: int) -> dict:
         user = await self.db.get_user(user_id)
         coach = await self.db.get_coach(user["coach_code"])
+        from .advice import targets_for
+        kcal, protein = targets_for(user)
         view = {"user_id": user_id, "role": user["role"], "goal": user["goal"], "lang": user["lang"],
-                "coach": {"name": coach["name"], "code": coach["code"]} if coach else None}
+                "coach": {"name": coach["name"], "code": coach["code"]} if coach else None,
+                "profile": {k: user[k] for k in ("sex", "birth_year", "height_cm", "weight_kg", "activity")},
+                "targets": {"kcal": kcal, "protein": protein, "set_by_pro": bool(user["kcal_target"])}}
+        if user["role"] == "operator":
+            n = await self.db.fetchone("SELECT COUNT(*) AS n FROM users WHERE channel = 'app' AND role = 'client'"
+                                       " AND coach_code IS NULL")
+            view["pro"] = {"name": "Команда Nutrivia", "invite_code": None, "students": n["n"], "limit": None,
+                           "operator": True}
         code = await self.pro_code(user_id)
         if code:
             pro = await self.db.get_coach(code)
@@ -548,12 +590,12 @@ class Service:
 
     async def students_view(self, pro_user_id: int) -> list[dict] | None:
         """Ученики специалиста: калории за сегодня и сколько разборов ждут проверки."""
-        code = await self.pro_code(pro_user_id)
-        if code is None:
+        scope = await self._scope(pro_user_id)
+        if scope is None:
             return None
         start, end = local_day_bounds()
         out = []
-        for u in await self.db.fetchall("SELECT * FROM users WHERE coach_code = ? ORDER BY joined_at, tg_id", (code,)):
+        for u in await self.db.fetchall(f"SELECT * FROM users WHERE {scope[0]} ORDER BY joined_at, tg_id", scope[1]):
             totals = await self.db.fetchone(
                 "SELECT COUNT(DISTINCT m.id) AS meals, COALESCE(SUM(i.kcal),0) AS kcal FROM meals m"
                 " LEFT JOIN meal_items i ON i.meal_id = m.id WHERE m.user_id = ? AND m.received_at >= ?"
@@ -563,50 +605,85 @@ class Service:
             from .advice import targets_for
             kcal_target, _ = targets_for(u)
             streak = await self.streak_view(u["tg_id"])
-            out.append({"user_id": u["tg_id"], "label": f"Ученик {len(out) + 1}", "goal": u["goal"],
+            out.append({"user_id": u["tg_id"], "label": f"{scope[2]} {len(out) + 1}", "goal": u["goal"],
                         "meals_today": totals["meals"], "kcal_today": round(totals["kcal"]),
                         "kcal_target": kcal_target, "pending_reviews": drafts["n"], "streak_days": streak["days"]})
         return out
 
     # --- проверка разборов специалистом в приложении ---
 
-    async def student_labels(self, code: str) -> dict[int, str]:
-        """«Ученик N» по порядку подключения — те же номера, что в списке учеников."""
-        rows = await self.db.fetchall("SELECT tg_id FROM users WHERE coach_code = ? ORDER BY joined_at, tg_id", (code,))
-        return {r["tg_id"]: f"Ученик {i + 1}" for i, r in enumerate(rows)}
+    OPERATOR_AFTER = 15 * 60  # разбор без проверки дольше 15 минут видит и оператор — так обещано клиенту
+
+    async def _scope(self, pro_user_id: int) -> tuple[str, tuple, str] | None:
+        """Чьих клиентов видит проверяющий: (условие на users, параметры, подпись).
+        Специалист — своих учеников. Оператор Nutrivia — клиентов приложения без тренера
+        (разборы учеников с тренером он тоже видит, если те ждут дольше OPERATOR_AFTER)."""
+        code = await self.pro_code(pro_user_id)
+        if code is not None:
+            return "coach_code = ?", (code,), "Ученик"
+        user = await self.db.get_user(pro_user_id)
+        if user and user["role"] == "operator":
+            return "channel = 'app' AND role = 'client' AND coach_code IS NULL", (), "Клиент"
+        return None
+
+    async def is_reviewer(self, user_id: int) -> bool:
+        return await self._scope(user_id) is not None
+
+    async def student_labels(self, pro_user_id: int) -> dict[int, str]:
+        """«Ученик N» / «Клиент N» по порядку подключения — те же номера, что в списке."""
+        cond, args, word = await self._scope(pro_user_id)
+        rows = await self.db.fetchall(f"SELECT tg_id FROM users WHERE {cond} ORDER BY joined_at, tg_id", args)
+        return {r["tg_id"]: f"{word} {i + 1}" for i, r in enumerate(rows)}
+
+    async def _operator_late(self) -> int:
+        return self.db.clock() - self.OPERATOR_AFTER
 
     async def pro_meal(self, pro_user_id: int, meal_id: int):
-        """Приём пищи ученика этого специалиста или None (чужие разборы не видны)."""
-        code = await self.pro_code(pro_user_id)
-        if code is None:
+        """Приём пищи, который этот проверяющий может видеть, или None (чужие разборы не видны)."""
+        scope = await self._scope(pro_user_id)
+        if scope is None:
             return None
+        cond, args, word = scope
+        if word == "Клиент":  # оператор: свои клиенты или просроченный черновик любого клиента приложения
+            return await self.db.fetchone(
+                "SELECT m.* FROM meals m JOIN users u ON u.tg_id = m.user_id WHERE m.id = ? AND u.channel = 'app'"
+                " AND u.role = 'client' AND (u.coach_code IS NULL OR (m.status = 'draft' AND m.received_at < ?))",
+                (meal_id, await self._operator_late()))
         return await self.db.fetchone(
-            "SELECT m.* FROM meals m JOIN users u ON u.tg_id = m.user_id WHERE m.id = ? AND u.coach_code = ?",
-            (meal_id, code))
+            f"SELECT m.* FROM meals m JOIN users u ON u.tg_id = m.user_id WHERE m.id = ? AND u.{cond}",
+            (meal_id, *args))
 
     async def pro_queue(self, pro_user_id: int) -> list[dict] | None:
         """Черновики учеников, старые сверху: их и надо проверить первыми (обещание — 15 минут)."""
-        code = await self.pro_code(pro_user_id)
-        if code is None:
+        scope = await self._scope(pro_user_id)
+        if scope is None:
             return None
-        labels = await self.student_labels(code)
-        rows = await self.db.fetchall(
-            "SELECT m.id, m.user_id FROM meals m JOIN users u ON u.tg_id = m.user_id"
-            " WHERE u.coach_code = ? AND m.status = 'draft' ORDER BY m.received_at", (code,))
+        cond, args, word = scope
+        labels = await self.student_labels(pro_user_id)
+        if word == "Клиент":
+            rows = await self.db.fetchall(
+                "SELECT m.id, m.user_id FROM meals m JOIN users u ON u.tg_id = m.user_id"
+                " WHERE m.status = 'draft' AND u.channel = 'app' AND u.role = 'client'"
+                " AND (u.coach_code IS NULL OR m.received_at < ?) ORDER BY m.received_at",
+                (await self._operator_late(),))
+        else:
+            rows = await self.db.fetchall(
+                f"SELECT m.id, m.user_id FROM meals m JOIN users u ON u.tg_id = m.user_id"
+                f" WHERE u.{cond} AND m.status = 'draft' ORDER BY m.received_at", args)
         out = []
         for r in rows:
             view = await self.meal_view(r["id"], r["user_id"])
-            out.append({**view, "student": labels.get(r["user_id"], "Ученик"), "student_id": r["user_id"]})
+            out.append({**view, "student": labels.get(r["user_id"], "Ученик тренера"), "student_id": r["user_id"]})
         return out
 
     async def pro_meal_view(self, pro_user_id: int, meal_id: int) -> dict | None:
         meal = await self.pro_meal(pro_user_id, meal_id)
         if meal is None:
             return None
-        labels = await self.student_labels(await self.pro_code(pro_user_id))
+        labels = await self.student_labels(pro_user_id)
         student = await self.db.get_user(meal["user_id"])
         view = await self.meal_view(meal_id, meal["user_id"])
-        return {**view, "student": labels.get(meal["user_id"], "Ученик"), "student_id": meal["user_id"],
+        return {**view, "student": labels.get(meal["user_id"], "Ученик тренера"), "student_id": meal["user_id"],
                 "student_goal": student["goal"], "student_restrictions": student["restrictions"]}
 
     async def pro_set_items(self, pro_user_id: int, meal_id: int, items: list[tuple[str, float]]) -> bool:

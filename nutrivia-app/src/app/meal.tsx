@@ -1,9 +1,9 @@
 import { router, useFocusEffect, useLocalSearchParams } from 'expo-router';
 import { useCallback, useState } from 'react';
-import { ActivityIndicator, ScrollView, StyleSheet, View, useWindowDimensions } from 'react-native';
+import { ActivityIndicator, Alert, Platform, Pressable, ScrollView, StyleSheet, View, useWindowDimensions } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
-import { ApiError, getMeal, type ServerMeal } from '@/api/client';
+import { ApiError, deleteMeal, getMeal, type ServerMeal } from '@/api/client';
 import { Button } from '@/components/button';
 import { Icon } from '@/components/icon';
 import { MealPhoto } from '@/components/meal-photo';
@@ -11,7 +11,7 @@ import { RoundButton } from '@/components/round-button';
 import { reviewedLabel, StatusPill } from '@/components/status-pill';
 import { Txt } from '@/components/txt';
 import { fmt, getDish, portionText } from '@/engine/engine';
-import { itemsFromServer, mealNutrients } from '@/store/app-store';
+import { itemsFromServer, mealNutrients, refreshToday, useAppStore } from '@/store/app-store';
 import { radius, space } from '@/theme/tokens';
 import { useColors } from '@/theme/use-colors';
 
@@ -31,6 +31,28 @@ export default function Meal() {
   const { id } = useLocalSearchParams<{ id: string }>();
   const [meal, setMeal] = useState<ServerMeal | null>(null);
   const [error, setError] = useState<string | null>(null);
+  const { dispatch } = useAppStore();
+
+  async function remove() {
+    const ok = () =>
+      deleteMeal(Number(id)).then(
+        () => {
+          refreshToday(dispatch);
+          router.back();
+        },
+        (e) => setError(e instanceof ApiError ? e.message : 'Не получилось удалить. Попробуйте ещё раз.'),
+      );
+    const title = 'Удалить приём пищи?';
+    const text = 'Фото и разбор удалятся насовсем, калории дня пересчитаются.';
+    if (Platform.OS === 'web') {
+      if (window.confirm(`${title}\n${text}`)) await ok();
+      return;
+    }
+    Alert.alert(title, text, [
+      { text: 'Отмена', style: 'cancel' },
+      { text: 'Удалить', style: 'destructive', onPress: ok },
+    ]);
+  }
 
   // Свежий статус при открытии; пока разбор ждёт проверки — раз в 15 секунд
   useFocusEffect(
@@ -58,15 +80,20 @@ export default function Meal() {
   const items = itemsFromServer(meal.items);
   const total = mealNutrients(items);
   const reviewed = meal.status === 'reviewed';
+  const manual = meal.status === 'manual';
   const adjusted = meal.items.some((i) => i.ai_grams && Math.abs(i.ai_grams - i.grams) >= 1);
 
   return (
     <ScrollView style={{ backgroundColor: c.bg }} contentContainerStyle={{ paddingBottom: insets.bottom + space[6] }}>
       <View>
-        <MealPhoto uri={meal.has_photo ? `server:${meal.id}` : null} width={width} height={320} />
+        {meal.has_photo ? (
+          <MealPhoto uri={`server:${meal.id}`} width={width} height={320} />
+        ) : (
+          <View style={{ height: insets.top + 64 }} />
+        )}
         <View style={[styles.photoBar, { top: insets.top + space[2] }]}>
           <RoundButton icon="back" label="Назад" onPress={() => router.back()} />
-          <StatusPill status={reviewed ? 'reviewed' : 'draft'} label={reviewed ? reviewedLabel(meal.reviewer?.role) : undefined} />
+          <StatusPill status={reviewed ? 'reviewed' : manual ? 'manual' : 'draft'} label={reviewed ? reviewedLabel(meal.reviewer?.role) : undefined} />
         </View>
       </View>
 
@@ -128,7 +155,7 @@ export default function Meal() {
               {meal.comment ?? (adjusted ? 'Порции поправлены, без комментария.' : 'Разбор подтверждён без замечаний.')}
             </Txt>
           </View>
-        ) : (
+        ) : manual ? null : (
           <View style={[styles.waiting, { backgroundColor: c.greenTint }]}>
             <Icon name="clock" size={20} color={c.greenText} />
             <Txt variant="caption" style={{ flex: 1, fontSize: 14, lineHeight: 20 }}>
@@ -136,6 +163,10 @@ export default function Meal() {
             </Txt>
           </View>
         )}
+        {error && <Txt variant="caption" tone="warning">{error}</Txt>}
+        <Pressable accessibilityRole="button" onPress={remove} style={[styles.delete, { backgroundColor: c.surface }]}>
+          <Txt variant="headline" tone="warning" style={{ fontSize: 15 }}>Удалить приём пищи</Txt>
+        </Pressable>
       </View>
     </ScrollView>
   );
@@ -152,5 +183,6 @@ const styles = StyleSheet.create({
   comment: { borderRadius: radius.m, padding: space[4], gap: space[3] },
   reviewer: { flexDirection: 'row', alignItems: 'center', gap: space[3] },
   avatar: { width: 36, height: 36, borderRadius: 18, alignItems: 'center', justifyContent: 'center' },
+  delete: { minHeight: 52, borderRadius: radius.m, alignItems: 'center', justifyContent: 'center' },
   waiting: { flexDirection: 'row', gap: space[3], alignItems: 'flex-start', borderRadius: radius.m, paddingVertical: space[3], paddingHorizontal: space[4] },
 });

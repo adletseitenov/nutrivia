@@ -4,11 +4,13 @@ import { Pressable, ScrollView, StyleSheet, View, useWindowDimensions } from 're
 
 import { Button } from '@/components/button';
 import { Icon } from '@/components/icon';
+import { MascotSlot } from '@/components/mascot-slot';
 import { MealPhoto } from '@/components/meal-photo';
 import { MacroDots } from '@/components/rings';
 import { RoundButton } from '@/components/round-button';
 import { Screen } from '@/components/screen';
 import { Txt } from '@/components/txt';
+import { FEATURES } from '@/lib/features';
 import { font, radius, space } from '@/theme/tokens';
 import { useColors } from '@/theme/use-colors';
 
@@ -23,6 +25,21 @@ export default function Feed() {
   const { width } = useWindowDimensions();
   const [tab, setTab] = useState(0);
   const [liked, setLiked] = useState(false);
+
+  if (!FEATURES.feed) {
+    return (
+      <Screen tabs>
+        <Txt variant="title" style={{ fontFamily: font.extrabold, fontSize: 28, lineHeight: 34 }}>Лента</Txt>
+        <View style={[styles.soon, { backgroundColor: c.surface }]}>
+          <MascotSlot stage={1} size={96} />
+          <Txt variant="headline" center>Скоро здесь будет лента</Txt>
+          <Txt variant="caption" tone="muted" center>
+            Рецепты и привычки других участников Nutrivia — делимся тем, что помогает питаться ровнее.
+          </Txt>
+        </View>
+      </Screen>
+    );
+  }
 
   return (
     <Screen tabs>
@@ -116,6 +133,7 @@ export default function Feed() {
 }
 
 const styles = StyleSheet.create({
+  soon: { borderRadius: radius.m, padding: space[5], alignItems: 'center', gap: space[3] },
   head: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' },
   chip: { paddingHorizontal: 14, paddingVertical: 8, borderRadius: radius.full },
   author: { flexDirection: 'row', alignItems: 'center', gap: 10 },

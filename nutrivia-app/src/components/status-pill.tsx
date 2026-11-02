@@ -6,12 +6,13 @@ import { useColors } from '@/theme/use-colors';
 import { Icon } from './icon';
 import { Txt } from './txt';
 
-export type MealStatus = 'draft' | 'reviewed' | 'needs-info';
+export type MealStatus = 'draft' | 'reviewed' | 'needs-info' | 'manual';
 
 const LABELS: Record<MealStatus, string> = {
   draft: 'Оценка по фото',
   reviewed: 'Проверено нутрициологом',
   'needs-info': 'Уточните блюдо',
+  manual: 'Записано вручную',
 };
 
 /** Подпись «проверено» по тому, кто проверял: тренер — «тренером», остальные — «нутрициологом». */
@@ -23,7 +24,7 @@ export function reviewedLabel(role?: string | null) {
 export function StatusPill({ status, label }: { status: MealStatus; label?: string }) {
   const c = useColors();
   const bg = status === 'reviewed' ? c.greenTint : c.surface;
-  const fg = { draft: c.muted, reviewed: c.greenText, 'needs-info': c.warning }[status];
+  const fg = { draft: c.muted, reviewed: c.greenText, 'needs-info': c.warning, manual: c.ink }[status];
   return (
     <View style={[styles.pill, { backgroundColor: bg }]}>
       {status === 'reviewed' ? (

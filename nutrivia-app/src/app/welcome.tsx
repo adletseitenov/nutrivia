@@ -8,6 +8,7 @@ import { Screen } from '@/components/screen';
 import { StatusPill } from '@/components/status-pill';
 import { Txt } from '@/components/txt';
 import { compute, getDish } from '@/engine/engine';
+import { FEATURES } from '@/lib/features';
 import { font, radius, space } from '@/theme/tokens';
 import { useColors } from '@/theme/use-colors';
 
@@ -40,9 +41,11 @@ export default function Welcome() {
       }>
       <View style={styles.top}>
         <Txt style={{ fontFamily: font.extrabold, fontSize: 22, lineHeight: 28, letterSpacing: -0.6 }}>Nutrivia</Txt>
-        <Pressable accessibilityRole="button" style={[styles.lang, { backgroundColor: c.surface }]}>
-          <Txt variant="label">Қазақша</Txt>
-        </Pressable>
+        {FEATURES.kazakh && (
+          <Pressable accessibilityRole="button" style={[styles.lang, { backgroundColor: c.surface }]}>
+            <Txt variant="label">Қазақша</Txt>
+          </Pressable>
+        )}
       </View>
 
       <View style={{ height: 340 }}>

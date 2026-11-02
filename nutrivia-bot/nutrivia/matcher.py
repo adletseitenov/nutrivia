@@ -11,6 +11,7 @@ from rapidfuzz import fuzz, process
 from .engine import Dish, DishBase
 
 FUZZY_THRESHOLD = 82
+WORD_ORDER_THRESHOLD = 90
 
 
 def normalize(text: str) -> str:
@@ -48,6 +49,10 @@ class Matcher:
             return Match(self.synonyms[key], "synonym", 100)
         best = process.extractOne(key, list(self._choices), scorer=fuzz.ratio)
         if best and best[1] >= FUZZY_THRESHOLD:
+            return Match(self._choices[best[0]], "fuzzy", best[1])
+        # «жареный картофель» = «картофель жареный»: те же слова в другом порядке
+        best = process.extractOne(key, list(self._choices), scorer=fuzz.token_sort_ratio)
+        if best and best[1] >= WORD_ORDER_THRESHOLD:
             return Match(self._choices[best[0]], "fuzzy", best[1])
         # «омлет с зеленью и грибами» → омлет: самое длинное известное название в начале фразы
         heads = [c for c in self._choices if key.startswith(c + " ")]

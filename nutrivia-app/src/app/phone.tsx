@@ -56,9 +56,9 @@ export default function Phone() {
         {!login && (
           <>
             <View style={[styles.progress, { backgroundColor: c.track }]}>
-              <View style={[styles.progressFill, { backgroundColor: c.ink }]} />
+              <View style={[styles.progressFill, { backgroundColor: c.ink, width: isClient ? '80%' : '75%' }]} />
             </View>
-            <Txt variant="caption" tone="muted">3 из 4</Txt>
+            <Txt variant="caption" tone="muted">{isClient ? '4 из 5' : '3 из 4'}</Txt>
           </>
         )}
       </View>
@@ -102,5 +102,5 @@ export default function Phone() {
 const styles = StyleSheet.create({
   head: { flexDirection: 'row', alignItems: 'center', gap: space[4], minHeight: 44 },
   progress: { flex: 1, height: 4, borderRadius: 2, overflow: 'hidden' },
-  progressFill: { width: '75%', height: 4, borderRadius: 2 },
+  progressFill: { height: 4, borderRadius: 2 },
 });

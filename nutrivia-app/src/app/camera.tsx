@@ -12,6 +12,7 @@ import { Icon } from '@/components/icon';
 import { PlovArt } from '@/components/plov-art';
 import { RoundButton } from '@/components/round-button';
 import { Txt } from '@/components/txt';
+import { FEATURES } from '@/lib/features';
 import { font, space } from '@/theme/tokens';
 
 type Mode = 'food' | 'fridge';
@@ -87,6 +88,7 @@ export default function Camera() {
           <Txt variant="caption" center style={{ color: 'rgba(255,255,255,0.68)' }}>{copy.sub}</Txt>
         </View>
 
+        {FEATURES.fridge && (
         <View style={styles.modes} accessibilityRole="radiogroup">
           {(['food', 'fridge'] as Mode[]).map((m) => {
             const on = m === mode;
@@ -104,6 +106,7 @@ export default function Camera() {
             );
           })}
         </View>
+        )}
 
         <View style={styles.controls}>
           <Pressable accessibilityRole="button" accessibilityLabel="Выбрать из галереи" onPress={pick} style={styles.side}>
@@ -112,7 +115,7 @@ export default function Camera() {
           <Pressable accessibilityRole="button" accessibilityLabel="Сделать снимок" onPress={shoot} style={({ pressed }) => [styles.shutter, { transform: [{ scale: pressed ? 0.94 : 1 }] }]}>
             <View style={styles.shutterInner} />
           </Pressable>
-          <Pressable accessibilityRole="button" accessibilityLabel="Ввести вручную" style={styles.side}>
+          <Pressable accessibilityRole="button" accessibilityLabel="Ввести вручную" onPress={() => router.replace('/manual')} style={styles.side}>
             <Icon name="edit" color="#FFFFFF" />
           </Pressable>
         </View>

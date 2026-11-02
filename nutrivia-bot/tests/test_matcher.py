@@ -34,6 +34,9 @@ def test_long_model_names(matcher):
         "тост из белого хлеба (бриошь)": "bread_white",
         "плов": "plov",
         "салат оливье": "olivier",
+        "жареный картофель": "potato_fried",
+        "отварной рис": "rice_boiled",
+        "яичница": "omelet",
     }
     for name, dish_id in cases.items():
         m = matcher.match(name)

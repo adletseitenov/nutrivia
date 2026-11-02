@@ -13,7 +13,7 @@ import { RoundButton } from '@/components/round-button';
 import { StatusPill } from '@/components/status-pill';
 import { Txt } from '@/components/txt';
 import { compute, fmt, getDish, portionCount, portionText } from '@/engine/engine';
-import { GOALS, itemsFromServer, mealNutrients, type MealItem } from '@/store/app-store';
+import { GOALS, itemsFromServer, mealNutrients, useAppStore, type MealItem } from '@/store/app-store';
 import { font, radius, space } from '@/theme/tokens';
 import { useColors } from '@/theme/use-colors';
 
@@ -40,6 +40,8 @@ export default function ProReview() {
   const { width } = useWindowDimensions();
   const { id } = useLocalSearchParams<{ id: string }>();
   const mealId = Number(id);
+  // Оператор проверяет клиентов, тренер и нутрициолог — своих учеников
+  const whom = useAppStore().state.me?.pro?.operator ? 'клиенту' : 'ученику';
   const [meal, setMeal] = useState<ProMeal | null>(null);
   const [items, setItems] = useState<MealItem[]>([]);
   const [comment, setComment] = useState('');
@@ -195,7 +197,7 @@ export default function ProReview() {
           </View>
 
           <View style={{ gap: space[2] }}>
-            <Txt variant="headline">Комментарий ученику</Txt>
+            <Txt variant="headline">Комментарий {whom}</Txt>
             <View style={styles.quick}>
               {QUICK.map((q) => (
                 <Pressable
@@ -214,14 +216,14 @@ export default function ProReview() {
               placeholderTextColor={c.muted}
               multiline
               maxLength={1000}
-              accessibilityLabel="Комментарий ученику"
+              accessibilityLabel={`Комментарий ${whom}`}
               style={[styles.comment, { backgroundColor: c.surface, color: c.ink }]}
             />
           </View>
 
           {error && <Txt tone="warning">{error}</Txt>}
           <Button
-            title={busy ? 'Отправляем…' : 'Отправить ученику'}
+            title={busy ? 'Отправляем…' : `Отправить ${whom}`}
             variant="accent"
             block
             disabled={busy || meal.status === 'reviewed' || hasUnmatched || items.length === 0}

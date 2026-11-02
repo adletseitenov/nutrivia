@@ -118,6 +118,11 @@ class Database:
             await self.conn.execute("ALTER TABLE users ADD COLUMN channel TEXT NOT NULL DEFAULT 'telegram'")
         if "role" not in cols:  # client | trainer | nutritionist
             await self.conn.execute("ALTER TABLE users ADD COLUMN role TEXT NOT NULL DEFAULT 'client'")
+        # Параметры для личной нормы калорий (приложение)
+        for col, kind in (("sex", "TEXT"), ("birth_year", "INTEGER"), ("height_cm", "REAL"),
+                          ("weight_kg", "REAL"), ("activity", "TEXT")):
+            if col not in cols:
+                await self.conn.execute(f"ALTER TABLE users ADD COLUMN {col} {kind}")
         await self.conn.commit()
 
     async def close(self) -> None:
@@ -197,7 +202,7 @@ class Database:
             " COALESCE(SUM(i.fat),0) AS fat, COALESCE(SUM(i.carbs),0) AS carbs"
             " FROM meals m JOIN meal_items i ON i.meal_id = m.id"
             " WHERE m.user_id = ? AND m.received_at >= ? AND m.received_at < ?"
-            " AND m.status IN ('sent','confirmed','corrected')",
+            " AND m.status IN ('sent','confirmed','corrected','manual')",
             (user_id, start, end),
         )
         return dict(row)

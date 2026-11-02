@@ -10,6 +10,7 @@ import {
 } from '@/api/client';
 
 import { add, compute, getDish, ZERO, type Nutrients } from '@/engine/engine';
+import type { Body } from '@/engine/targets';
 import type { MealStatus } from '@/components/status-pill';
 
 export type Goal = 'lose' | 'muscle' | 'even' | 'coach';
@@ -44,7 +45,7 @@ export function itemsFromServer(items: ServerItem[]): MealItem[] {
   }));
 }
 
-function mealFromServer(m: ServerMeal): Meal {
+export function mealFromServer(m: ServerMeal): Meal {
   const d = new Date((m.received_at ?? 0) * 1000);
   const names = m.items.map((i, j) => (j ? i.name.charAt(0).toLowerCase() + i.name.slice(1) : i.name));
   return {
@@ -54,7 +55,7 @@ function mealFromServer(m: ServerMeal): Meal {
     time: `${String(d.getHours()).padStart(2, '0')}:${String(d.getMinutes()).padStart(2, '0')}`,
     photo: m.has_photo ? `server:${m.id}` : null,
     items: itemsFromServer(m.items),
-    status: m.status === 'reviewed' ? 'reviewed' : 'draft',
+    status: m.status === 'reviewed' ? 'reviewed' : m.status === 'manual' ? 'manual' : 'draft',
     reviewerRole: m.reviewer?.role ?? null,
   };
 }
@@ -69,7 +70,7 @@ type State = {
   loaded: boolean;
   goal: Goal;
   /** выбор на экранах регистрации до входа по SMS */
-  signup: { role: Role; name: string; inviteCode: string };
+  signup: { role: Role; name: string; inviteCode: string; body: Body | null };
   me: Me | null;
   meals: Meal[];
   serverTargets: { kcal: number; protein: number } | null;
@@ -96,7 +97,7 @@ const initial: State = {
   onboarded: false,
   loaded: false,
   goal: 'lose',
-  signup: { role: 'client', name: '', inviteCode: '' },
+  signup: { role: 'client', name: '', inviteCode: '', body: null },
   me: null,
   meals: [],
   serverTargets: null,
@@ -212,8 +213,8 @@ export function useTargets() {
   const { state } = useAppStore();
   // Ориентир с сервера главнее: его может поменять нутрициолог (/target в группе проверки)
   const g = GOALS.find((x) => x.id === state.goal)!;
-  const kcal = state.serverTargets?.kcal ?? g.kcal ?? 2000;
-  const protein = state.serverTargets?.protein ?? g.protein ?? 75;
+  const kcal = state.serverTargets?.kcal ?? state.me?.targets?.kcal ?? g.kcal ?? 2000;
+  const protein = state.serverTargets?.protein ?? state.me?.targets?.protein ?? g.protein ?? 75;
   return { kcal, protein, carbs: Math.round((kcal * 0.5) / 4), fat: Math.round((kcal * 0.3) / 9) };
 }
 

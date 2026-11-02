@@ -35,9 +35,9 @@ export default function RoleScreen() {
       <View style={styles.head}>
         <RoundButton icon="back" label="Назад" onPress={() => router.back()} />
         <View style={[styles.progress, { backgroundColor: c.track }]}>
-          <View style={[styles.progressFill, { backgroundColor: c.ink, width: '25%' }]} />
+          <View style={[styles.progressFill, { backgroundColor: c.ink, width: role === 'client' ? '20%' : '25%' }]} />
         </View>
-        <Txt variant="caption" tone="muted">1 из 4</Txt>
+        <Txt variant="caption" tone="muted">{role === 'client' ? '1 из 5' : '1 из 4'}</Txt>
       </View>
 
       <View style={{ gap: space[2] }}>

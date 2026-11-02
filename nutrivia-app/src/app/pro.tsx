@@ -15,8 +15,8 @@ import { font, radius, space } from '@/theme/tokens';
 import { useColors } from '@/theme/use-colors';
 
 /**
- * Кабинет тренера или нутрициолога: код приглашения и ученики за сегодня.
- * Проверка разборов пока идёт в группе в Telegram — здесь только обзор.
+ * Кабинет тренера, нутрициолога или оператора Nutrivia: очередь разборов на проверку и клиенты за сегодня.
+ * У тренера и нутрициолога ещё код приглашения для учеников.
  */
 export default function Pro() {
   const c = useColors();
@@ -43,9 +43,10 @@ export default function Pro() {
 
   const pro = data?.me.pro;
   const isTrainer = data?.me.role === 'trainer';
+  const isOperator = !!pro?.operator;
 
   async function share() {
-    if (!pro) return;
+    if (!pro?.invite_code) return;
     await Share.share({
       message: `Веду питание в Nutrivia. Установите приложение и при регистрации введите мой код: ${pro.invite_code}`,
     });
@@ -60,7 +61,7 @@ export default function Pro() {
   return (
     <Screen>
       <View>
-        <Txt variant="caption" tone="muted">{isTrainer ? 'Кабинет тренера' : 'Кабинет нутрициолога'}</Txt>
+        <Txt variant="caption" tone="muted">{isOperator ? 'Кабинет оператора' : isTrainer ? 'Кабинет тренера' : 'Кабинет нутрициолога'}</Txt>
         <Txt variant="title" style={{ fontFamily: font.extrabold, fontSize: 28, lineHeight: 34 }}>{pro?.name ?? '…'}</Txt>
       </View>
 
@@ -69,18 +70,20 @@ export default function Pro() {
 
       {pro && (
         <>
-          <View style={[styles.codeCard, { backgroundColor: c.ink }]}>
-            <Txt variant="caption" style={{ color: c.onInk, opacity: 0.7 }}>Ваш код для учеников</Txt>
-            <Txt style={{ fontFamily: font.extrabold, fontSize: 40, lineHeight: 46, letterSpacing: 4, color: c.onInk }} selectable>
-              {pro.invite_code}
-            </Txt>
-            <Txt variant="caption" style={{ color: c.onInk, opacity: 0.7 }}>
-              {pro.limit !== null
-                ? `Учеников: ${pro.students} из ${pro.limit}`
-                : `Учеников: ${pro.students}`}
-            </Txt>
-            <Button title="Отправить код" variant="accent" onPress={share} style={{ alignSelf: 'flex-start', marginTop: space[2] }} />
-          </View>
+          {!isOperator && (
+            <View style={[styles.codeCard, { backgroundColor: c.ink }]}>
+              <Txt variant="caption" style={{ color: c.onInk, opacity: 0.7 }}>Ваш код для учеников</Txt>
+              <Txt style={{ fontFamily: font.extrabold, fontSize: 40, lineHeight: 46, letterSpacing: 4, color: c.onInk }} selectable>
+                {pro.invite_code}
+              </Txt>
+              <Txt variant="caption" style={{ color: c.onInk, opacity: 0.7 }}>
+                {pro.limit !== null
+                  ? `Учеников: ${pro.students} из ${pro.limit}`
+                  : `Учеников: ${pro.students}`}
+              </Txt>
+              <Button title="Отправить код" variant="accent" onPress={share} style={{ alignSelf: 'flex-start', marginTop: space[2] }} />
+            </View>
+          )}
 
           <View style={{ gap: space[3] }}>
             <View style={styles.row}>
@@ -113,12 +116,12 @@ export default function Pro() {
           </View>
 
           <View style={{ gap: space[3] }}>
-            <Txt variant="title" style={{ fontSize: 20, lineHeight: 26 }}>Ученики сегодня</Txt>
+            <Txt variant="title" style={{ fontSize: 20, lineHeight: 26 }}>{isOperator ? 'Клиенты без тренера' : 'Ученики сегодня'}</Txt>
             {data.students.length === 0 && (
               <View style={[styles.empty, { backgroundColor: c.surface }]}>
                 <Txt variant="headline" center>Пока никого</Txt>
                 <Txt variant="caption" tone="muted" center>
-                  Отправьте код ученику — он введёт его при регистрации или в профиле.
+                  {isOperator ? 'Все клиенты пока с тренерами.' : 'Отправьте код ученику — он введёт его при регистрации или в профиле.'}
                 </Txt>
               </View>
             )}
@@ -146,7 +149,9 @@ export default function Pro() {
       )}
 
       <Txt variant="caption" tone="muted">
-        Разборы приходят сюда сразу после фото. Ученик ждёт проверку в течение 15 минут — если не успеваете, их проверят операторы Nutrivia.
+        {isOperator
+          ? 'Здесь разборы клиентов без тренера и разборы учеников, которые ждут дольше 15 минут.'
+          : 'Разборы приходят сюда сразу после фото. Ученик ждёт проверку в течение 15 минут — если не успеваете, их проверят операторы Nutrivia.'}
       </Txt>
       <Button title="Выйти" variant="secondary" onPress={signOut} />
     </Screen>

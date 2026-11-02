@@ -8,3 +8,4 @@ __pycache__/
 data/*.db-*
 data/pilot-photos/
 data/pilot-logs/
+data/dev-photos/

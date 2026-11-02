@@ -15,8 +15,36 @@ DEFAULT_TARGETS = {
 }
 
 
-def targets_for(user) -> tuple[int, int]:
+# Личная норма: Миффлин — Сан-Жеор × активность × поправка на цель. Черновик — сверяет нутрициолог-партнёр.
+ACTIVITY = {"low": 1.2, "light": 1.375, "mid": 1.55, "high": 1.725}
+GOAL_FACTOR = {"lose": 0.85, "muscle": 1.1, "even": 1.0}
+PROTEIN_PER_KG = {"lose": 1.6, "muscle": 1.8, "even": 1.2}
+MIN_KCAL = {"f": 1200, "m": 1500}  # ниже ориентир не опускаем
+
+
+def personal_targets(sex: str, age: int, height_cm: float, weight_kg: float, activity: str,
+                     goal: str | None) -> tuple[int, int]:
+    """Ориентир калорий и белка по параметрам человека. Округление: калории до 50, белок до 5 г."""
+    bmr = 10 * weight_kg + 6.25 * height_cm - 5 * age + (5 if sex == "m" else -161)
+    kcal = bmr * ACTIVITY.get(activity, ACTIVITY["light"]) * GOAL_FACTOR.get(goal, 1.0)
+    kcal = max(MIN_KCAL.get(sex, 1200), round(kcal / 50) * 50)
+    protein = round(weight_kg * PROTEIN_PER_KG.get(goal, 1.2) / 5) * 5
+    return int(kcal), int(protein)
+
+
+def profile_complete(user) -> bool:
+    keys = user.keys()
+    return all(k in keys and user[k] for k in ("sex", "birth_year", "height_cm", "weight_kg", "activity"))
+
+
+def targets_for(user, year: int | None = None) -> tuple[int, int]:
+    """Ориентир, заданный нутрициологом (/target), главнее; затем личный по параметрам; иначе по цели."""
     kcal, protein = DEFAULT_TARGETS.get(user["goal"], DEFAULT_TARGETS[None])
+    if profile_complete(user):
+        from datetime import datetime
+        age = (year or datetime.now().year) - user["birth_year"]
+        kcal, protein = personal_targets(user["sex"], age, user["height_cm"], user["weight_kg"],
+                                         user["activity"], user["goal"])
     return (user["kcal_target"] or kcal), protein
 
 

@@ -12,6 +12,7 @@ import os
 import secrets
 from pathlib import Path
 from contextlib import asynccontextmanager
+from datetime import datetime
 from typing import Annotated, Literal
 
 from fastapi import BackgroundTasks, Depends, FastAPI, File, Header, HTTPException, Query, Request, UploadFile
@@ -20,7 +21,7 @@ from pydantic import BaseModel, Field
 from rapidfuzz import fuzz, process
 
 from .auth import AuthError, ConsoleSms, ManualCodes, MobizonSms, SmsAuth, SmsProvider
-from .config import Config, load_config
+from .config import ALMATY, Config, load_config
 from .db import Database
 from .engine import DishBase
 from .matcher import normalize
@@ -148,7 +149,13 @@ def create_app(cfg: Config | None = None, vision: VisionProvider | None = None, 
         invite_code: str | None = Field(default=None, max_length=16)
 
     class MePatch(BaseModel):
-        goal: Literal["lose", "muscle", "even", "coach_plan"]
+        """Цель и параметры для личной нормы; передаются только меняемые поля."""
+        goal: Literal["lose", "muscle", "even", "coach_plan"] | None = None
+        sex: Literal["f", "m"] | None = None
+        birth_year: int | None = Field(default=None, ge=1920, le=2100)
+        height_cm: float | None = Field(default=None, ge=120, le=230)
+        weight_kg: float | None = Field(default=None, ge=35, le=300)
+        activity: Literal["low", "light", "mid", "high"] | None = None
 
     class JoinIn(BaseModel):
         invite_code: str = Field(min_length=4, max_length=16)
@@ -159,6 +166,10 @@ def create_app(cfg: Config | None = None, vision: VisionProvider | None = None, 
 
     class ItemsIn(BaseModel):
         items: list[ItemIn] = Field(min_length=1, max_length=20)
+
+    class ManualIn(ItemsIn):
+        # День из полосы дней: дописать еду в прошлое (не дальше недели); без него — сейчас
+        date: str | None = Field(default=None, pattern=r"^\d{4}-\d{2}-\d{2}$")
 
     @app.get("/health")
     async def health():
@@ -210,7 +221,13 @@ def create_app(cfg: Config | None = None, vision: VisionProvider | None = None, 
 
     @app.patch("/v1/me")
     async def patch_me(body: MePatch, svc: Svc, user: User):
-        await svc.db.update_user(user["tg_id"], goal=body.goal)
+        fields = body.model_dump(exclude_none=True)
+        if "birth_year" in fields:
+            year = datetime.fromtimestamp(svc.db.clock(), ALMATY).year
+            if year - fields["birth_year"] < 18:
+                raise AuthError("under_18", "Nutrivia — только для взрослых, от 18 лет.", 400)
+        if fields:
+            await svc.db.update_user(user["tg_id"], **fields)
         return await svc.me_view(user["tg_id"])
 
     @app.post("/v1/me/coach")
@@ -241,7 +258,7 @@ def create_app(cfg: Config | None = None, vision: VisionProvider | None = None, 
     }
 
     async def pro_dep(svc: Svc, user: User):
-        if await svc.pro_code(user["tg_id"]) is None:
+        if not await svc.is_reviewer(user["tg_id"]):
             raise HTTPException(403, "pro only")
         return user
 
@@ -341,9 +358,37 @@ def create_app(cfg: Config | None = None, vision: VisionProvider | None = None, 
             raise HTTPException(404)
         return await svc.meal_view(meal_id, user["tg_id"])
 
+    def day_ts(date: str | None, svc: Service) -> int | None:
+        """«2026-11-01» → полдень этого дня по Алматы (для выборки дня); None — сегодня."""
+        if not date:
+            return None
+        try:
+            d = datetime.strptime(date, "%Y-%m-%d").replace(hour=12, tzinfo=ALMATY)
+        except ValueError:
+            raise HTTPException(422, "date: YYYY-MM-DD")
+        ts = int(d.timestamp())
+        if ts > svc.db.clock() + 86400:
+            raise HTTPException(422, "date in the future")
+        return ts
+
     @app.get("/v1/today")
-    async def today(svc: Svc, user: User):
-        return await svc.today_view(user["tg_id"])
+    async def today(svc: Svc, user: User, date: str | None = None):
+        return await svc.today_view(user["tg_id"], day_ts(date, svc))
+
+    @app.post("/v1/meals/manual")
+    async def manual_meal(body: ManualIn, svc: Svc, user: User):
+        ts = day_ts(body.date, svc)
+        if ts is not None and ts > svc.db.clock():
+            ts = svc.db.clock()  # сегодняшний день — текущее время, а не полдень
+        meal_id = await svc.manual_meal(user["tg_id"], [(i.dish_id, i.grams) for i in body.items], ts)
+        if meal_id is None:
+            raise HTTPException(422, "unknown dish or date out of range")
+        return await svc.meal_view(meal_id, user["tg_id"])
+
+    @app.delete("/v1/meals/{meal_id}", status_code=204)
+    async def delete_meal(meal_id: int, svc: Svc, user: User):
+        if not await svc.delete_meal(meal_id, user["tg_id"]):
+            raise HTTPException(404)
 
     @app.get("/v1/progress")
     async def progress(svc: Svc, user: User):
