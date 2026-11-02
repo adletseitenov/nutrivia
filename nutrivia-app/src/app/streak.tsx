@@ -56,7 +56,7 @@ export default function Streak() {
             ? `Ещё ${s.next_stage_in} ${daysWord(s.next_stage_in)} подряд — и маскот вырастет до стадии ${s.stage + 1}`
             : 'Маскот вырос полностью'}
         </Txt>
-        <Txt variant="caption" tone={s.today_counted ? 'green' : 'muted'} center>
+        <Txt variant="caption" tone={s.today_counted ? 'accent' : 'muted'} center>
           {s.today_counted
             ? 'Сегодня засчитано'
             : `Чтобы засчитать сегодня, нужно ещё ${toCount} фото еды`}
@@ -69,7 +69,7 @@ export default function Streak() {
           const now = i + 1 === s.stage;
           return (
             <View key={d} style={{ flex: 1, alignItems: 'center', gap: 6 }}>
-              <View style={[styles.stageBar, { backgroundColor: passed ? c.green : now ? c.ink : c.track }]} />
+              <View style={[styles.stageBar, { backgroundColor: passed ? c.accent : now ? c.ink : c.track }]} />
               <Txt style={{ fontSize: 12, lineHeight: 16, fontFamily: now ? font.bold : font.medium, color: now || passed ? c.ink : c.muted }}>
                 {i === 0 ? 'Росток' : `Стадия ${i + 1}`}
               </Txt>
@@ -84,7 +84,7 @@ export default function Streak() {
       <View style={[styles.tasks, { backgroundColor: c.surface }]}>
         <View style={styles.tasksHead}>
           <Txt variant="headline">Задания на сегодня</Txt>
-          <Txt variant="label" tone="green" style={{ fontSize: 13 }}>{done} из {TASKS.length}</Txt>
+          <Txt variant="label" tone="accent" style={{ fontSize: 13 }}>{done} из {TASKS.length}</Txt>
         </View>
         {TASKS.map((t) => {
           const on = tasks[t.id];
@@ -98,8 +98,8 @@ export default function Streak() {
               disabled={!manual}
               onPress={() => { Haptics.selectionAsync(); dispatch({ type: 'toggleAdvice' }); }}
               style={styles.task}>
-              <View style={[styles.box, on ? { backgroundColor: c.green } : { borderWidth: 1.75, borderColor: c.muted }]}>
-                {on && <Icon name="check" size={16} color={c.onGreen} strokeWidth={2.4} />}
+              <View style={[styles.box, on ? { backgroundColor: c.accent } : { borderWidth: 1.75, borderColor: c.muted }]}>
+                {on && <Icon name="check" size={16} color={c.onAccent} strokeWidth={2.4} />}
               </View>
               <View style={{ flex: 1 }}>
                 <Txt

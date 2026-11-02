@@ -23,8 +23,8 @@ export function reviewedLabel(role?: string | null) {
 /** Статус разбора: у каждого есть слово, смысл не держится только на цвете. */
 export function StatusPill({ status, label }: { status: MealStatus; label?: string }) {
   const c = useColors();
-  const bg = status === 'reviewed' ? c.greenTint : c.surface;
-  const fg = { draft: c.muted, reviewed: c.greenText, 'needs-info': c.warning, manual: c.ink }[status];
+  const bg = status === 'reviewed' ? c.accentTint : c.surface;
+  const fg = { draft: c.muted, reviewed: c.accentText, 'needs-info': c.warning, manual: c.ink }[status];
   return (
     <View style={[styles.pill, { backgroundColor: bg }]}>
       {status === 'reviewed' ? (

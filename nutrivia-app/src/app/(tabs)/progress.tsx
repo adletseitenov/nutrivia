@@ -73,7 +73,7 @@ export default function Progress() {
                 const isToday = i === week.days.length - 1;
                 const h = d.meals ? Math.max(6, (d.kcal / scaleMax) * CHART_H) : 6;
                 return (
-                  <View key={d.date} style={[styles.bar, { height: h, backgroundColor: !d.meals ? c.track : isToday ? c.green : c.ink }]} />
+                  <View key={d.date} style={[styles.bar, { height: h, backgroundColor: !d.meals ? c.track : isToday ? c.accent : c.ink }]} />
                 );
               })}
             </View>

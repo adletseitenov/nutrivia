@@ -44,7 +44,7 @@ export default function RootLayout() {
   const dark = scheme === 'dark';
   const base = dark ? DarkTheme : DefaultTheme;
   const c = dark ? palette.dark : palette.light;
-  const theme = { ...base, colors: { ...base.colors, background: c.bg, card: c.bg, text: c.ink, primary: c.green, border: c.line } };
+  const theme = { ...base, colors: { ...base.colors, background: c.bg, card: c.bg, text: c.ink, primary: c.accent, border: c.line } };
 
   return (
     <ThemeProvider value={theme}>

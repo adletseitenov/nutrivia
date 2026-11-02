@@ -61,7 +61,7 @@ export default function Fridge() {
               </Pressable>
             ))}
             <Pressable accessibilityRole="button" style={[styles.chip, styles.addChip, { borderColor: c.line }]}>
-              <Txt variant="label" tone="green" style={{ fontSize: 14, lineHeight: 18 }}>+ Добавить</Txt>
+              <Txt variant="label" tone="accent" style={{ fontSize: 14, lineHeight: 18 }}>+ Добавить</Txt>
             </Pressable>
           </View>
 
@@ -71,7 +71,7 @@ export default function Fridge() {
               <Txt variant="headline">{fmt(left)} ккал · белок {fmt(proteinLeft)} г</Txt>
             </View>
             <View style={[styles.track, { backgroundColor: c.track }]}>
-              <View style={{ width: `${Math.min(100, (eaten.kcal / t.kcal) * 100)}%`, height: 6, borderRadius: 3, backgroundColor: c.green }} />
+              <View style={{ width: `${Math.min(100, (eaten.kcal / t.kcal) * 100)}%`, height: 6, borderRadius: 3, backgroundColor: c.accent }} />
             </View>
           </View>
 

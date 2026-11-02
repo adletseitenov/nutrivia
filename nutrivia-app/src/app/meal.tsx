@@ -128,7 +128,7 @@ export default function Meal() {
                     {it.kcal !== null ? ` · ${fmt(it.kcal)} ккал` : ''}
                   </Txt>
                   {changed && (
-                    <Txt variant="caption" tone="green">по фото было ≈{fmt(it.ai_grams ?? 0)} г — поправлено при проверке</Txt>
+                    <Txt variant="caption" tone="accent">по фото было ≈{fmt(it.ai_grams ?? 0)} г — поправлено при проверке</Txt>
                   )}
                   {!dish && <Txt variant="caption" tone="warning">Нет в нашей базе — нутрициолог уточнит</Txt>}
                 </View>
@@ -149,15 +149,15 @@ export default function Meal() {
                   {ROLE_LABEL[meal.reviewer?.role ?? 'operator']} · проверено в {hhmm(meal.reviewed_at)}
                 </Txt>
               </View>
-              <Icon name="check" size={20} color={c.greenText} strokeWidth={2.2} />
+              <Icon name="check" size={20} color={c.accentText} strokeWidth={2.2} />
             </View>
             <Txt style={{ fontSize: 15, lineHeight: 22, color: meal.comment ? c.ink : c.muted }}>
               {meal.comment ?? (adjusted ? 'Порции поправлены, без комментария.' : 'Разбор подтверждён без замечаний.')}
             </Txt>
           </View>
         ) : manual ? null : (
-          <View style={[styles.waiting, { backgroundColor: c.greenTint }]}>
-            <Icon name="clock" size={20} color={c.greenText} />
+          <View style={[styles.waiting, { backgroundColor: c.accentTint }]}>
+            <Icon name="clock" size={20} color={c.accentText} />
             <Txt variant="caption" style={{ flex: 1, fontSize: 14, lineHeight: 20 }}>
               Это оценка по фото. Нутрициолог проверит разбор в течение 15 минут — комментарий появится здесь.
             </Txt>

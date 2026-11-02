@@ -73,8 +73,8 @@ export default function Feed() {
             <Txt variant="headline" style={{ fontSize: 15, lineHeight: 20 }}>Мадина К.</Txt>
             <Txt variant="caption" tone="muted" style={{ fontSize: 12 }}>Рецепт · 2 ч назад</Txt>
           </View>
-          <View style={[styles.badge, { backgroundColor: c.greenTint }]}>
-            <Txt variant="label" tone="green">Серия 21 день</Txt>
+          <View style={[styles.badge, { backgroundColor: c.accentTint }]}>
+            <Txt variant="label" tone="accent">Серия 21 день</Txt>
           </View>
         </View>
         <View>

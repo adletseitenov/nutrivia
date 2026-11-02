@@ -8,7 +8,7 @@ import { Txt } from './txt';
 
 type Props = Omit<PressableProps, 'style'> & {
   title: string;
-  /** primary — одна чёрная на экран; secondary — серая; accent — зелёная («Верно», камера) */
+  /** primary — одна чёрная на экран; secondary — серая; accent — фиолетовая («Верно», камера) */
   variant?: 'primary' | 'secondary' | 'accent';
   size?: 's' | 'm';
   block?: boolean;
@@ -17,8 +17,8 @@ type Props = Omit<PressableProps, 'style'> & {
 
 export function Button({ title, variant = 'primary', size = 'm', block, style, onPress, disabled, ...rest }: Props) {
   const c = useColors();
-  const bg = { primary: c.ink, secondary: c.surface, accent: c.green }[variant];
-  const fg = { primary: c.onInk, secondary: c.ink, accent: c.onGreen }[variant];
+  const bg = { primary: c.ink, secondary: c.surface, accent: c.accent }[variant];
+  const fg = { primary: c.onInk, secondary: c.ink, accent: c.onAccent }[variant];
   return (
     <Pressable
       accessibilityRole="button"

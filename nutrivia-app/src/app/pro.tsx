@@ -134,7 +134,7 @@ export default function Pro() {
                   </Txt>
                 </View>
                 <View style={[styles.track, { backgroundColor: c.track }]}>
-                  <View style={{ width: `${Math.min(100, (s.kcal_today / s.kcal_target) * 100)}%`, height: 6, borderRadius: 3, backgroundColor: c.green }} />
+                  <View style={{ width: `${Math.min(100, (s.kcal_today / s.kcal_target) * 100)}%`, height: 6, borderRadius: 3, backgroundColor: c.accent }} />
                 </View>
                 <View style={styles.row}>
                   <Txt variant="caption" tone="muted">

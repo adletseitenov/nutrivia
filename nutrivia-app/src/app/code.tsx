@@ -131,7 +131,7 @@ export default function Code() {
         <Txt variant="caption" tone="muted">Нет кода или он не подходит — напишите команде Nutrivia, пришлём новый.</Txt>
       ) : (
         <Pressable accessibilityRole="button" disabled={wait > 0} onPress={resend} style={styles.resend}>
-          <Txt variant="headline" style={{ fontSize: 15, color: wait > 0 ? c.muted : c.greenText }}>
+          <Txt variant="headline" style={{ fontSize: 15, color: wait > 0 ? c.muted : c.accentText }}>
             {wait > 0 ? `Отправить ещё раз через ${wait} с` : 'Отправить код ещё раз'}
           </Txt>
         </Pressable>

@@ -17,7 +17,7 @@ const TABS: Record<string, { label: string; icon: IconName }> = {
   profile: { label: 'Профиль', icon: 'user' },
 };
 
-/** Нижняя панель: 4 вкладки и зелёная кнопка камеры по центру. */
+/** Нижняя панель: 4 вкладки и фиолетовая кнопка камеры по центру. */
 export function TabBar({ state, navigateToTab }: BottomTabBarProps) {
   const c = useColors();
   const insets = useSafeAreaInsets();
@@ -34,8 +34,8 @@ export function TabBar({ state, navigateToTab }: BottomTabBarProps) {
                   Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
                   router.push('/camera');
                 }}
-                style={({ pressed }) => [styles.camera, { backgroundColor: c.green, transform: [{ scale: pressed ? 0.95 : 1 }] }]}>
-                <Icon name="camera" size={28} color={c.onGreen} strokeWidth={2} />
+                style={({ pressed }) => [styles.camera, { backgroundColor: c.accent, transform: [{ scale: pressed ? 0.95 : 1 }] }]}>
+                <Icon name="camera" size={28} color={c.onAccent} strokeWidth={2} />
               </Pressable>
             </View>
           );
@@ -65,11 +65,11 @@ export function TabBar({ state, navigateToTab }: BottomTabBarProps) {
 const styles = StyleSheet.create({
   bar: {
     flexDirection: 'row', paddingTop: 10, paddingHorizontal: 12,
-    shadowColor: '#0B0D0C', shadowOpacity: 0.08, shadowRadius: 16, shadowOffset: { width: 0, height: -8 }, elevation: 12,
+    shadowColor: '#0E0C16', shadowOpacity: 0.08, shadowRadius: 16, shadowOffset: { width: 0, height: -8 }, elevation: 12,
   },
   item: { flex: 1, alignItems: 'center', gap: 2, minHeight: 44, justifyContent: 'center' },
   camera: {
     width: 60, height: 60, borderRadius: 30, marginTop: -30, alignItems: 'center', justifyContent: 'center',
-    shadowColor: '#1FA463', shadowOpacity: 0.35, shadowRadius: 12, shadowOffset: { width: 0, height: 8 }, elevation: 8,
+    shadowColor: '#6B4EFF', shadowOpacity: 0.35, shadowRadius: 12, shadowOffset: { width: 0, height: 8 }, elevation: 8,
   },
 });

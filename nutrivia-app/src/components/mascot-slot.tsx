@@ -6,8 +6,9 @@ import { useColors } from '@/theme/use-colors';
 import { Txt } from './txt';
 
 /**
- * Слот под маскота. Маскот растёт по стадиям (1–5) от серии дней и заданий.
- * Когда появятся файлы mascot-stage-N, передайте их в MASCOT_STAGES — раскладка не изменится.
+ * Слот под маскота «Голубику» (рисует художник). Растёт по стадиям 1–5 от серии дней и заданий.
+ * Когда придут файлы, положите их в assets/mascot/stage-N.png и пропишите здесь:
+ *   1: require('@/assets/mascot/stage-1.png'), … — раскладка экранов не изменится.
  */
 export const MASCOT_STAGES: Partial<Record<number, ImageSource>> = {};
 
@@ -18,8 +19,8 @@ export function MascotSlot({ stage, size = 120 }: { stage?: number; size?: numbe
   return (
     <View
       accessibilityLabel="Место для маскота"
-      style={[styles.empty, { width: size, height: size, borderRadius: size / 2, backgroundColor: c.surface, borderColor: c.line }]}>
-      <Txt variant="caption" tone="muted">{stage ? `Стадия ${stage}` : 'Маскот'}</Txt>
+      style={[styles.empty, { width: size, height: size, borderRadius: size / 2, backgroundColor: c.accentTint, borderColor: c.accent }]}>
+      <Txt variant="caption" tone="accent" center>{stage ? `Голубика\nстадия ${stage}` : 'Голубика'}</Txt>
     </View>
   );
 }

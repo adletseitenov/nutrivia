@@ -58,8 +58,8 @@ export default function Today() {
           accessibilityLabel={streak ? `Серия: ${streak.days} ${daysWord(streak.days)} подряд` : 'Серия'}
           onPress={() => router.push('/streak')}
           style={[styles.streak, { backgroundColor: c.surface }]}>
-          <View style={[styles.streakMascot, { backgroundColor: c.greenTint, borderColor: c.green }]}>
-            <Txt style={{ fontFamily: font.bold, fontSize: 10, color: c.greenText }}>ст.{streak?.stage ?? 1}</Txt>
+          <View style={[styles.streakMascot, { backgroundColor: c.accentTint, borderColor: c.accent }]}>
+            <Txt style={{ fontFamily: font.bold, fontSize: 10, color: c.accentText }}>ст.{streak?.stage ?? 1}</Txt>
           </View>
           <View>
             <Txt style={{ fontFamily: font.extrabold, fontSize: 17, lineHeight: 20 }}>{streak?.days ?? '—'}</Txt>
@@ -73,9 +73,9 @@ export default function Today() {
           const isToday = i === week.length - 1;
           const on = picked ? d.date === picked : isToday;
           const fg = on ? c.onInk : c.ink;
-          // Зелёная точка — день засчитан в серию, серая — есть фото, но меньше нормы
+          // Фиолетовая точка — день засчитан в серию, серая — есть фото, но меньше нормы
           const counted = d.meals >= (streak?.min_photos ?? 2);
-          const dot = counted ? c.green : d.meals ? c.muted : 'transparent';
+          const dot = counted ? c.accent : d.meals ? c.muted : 'transparent';
           return (
             <Pressable
               key={d.date}
@@ -107,7 +107,7 @@ export default function Today() {
         <View style={styles.sectionHead}>
           <Txt variant="title" style={{ fontSize: 20, lineHeight: 26 }}>Приёмы пищи</Txt>
           <Pressable accessibilityRole="button" onPress={addManual} hitSlop={8}>
-            <Txt variant="headline" style={{ fontSize: 15, color: c.greenText }}>+ Без фото</Txt>
+            <Txt variant="headline" style={{ fontSize: 15, color: c.accentText }}>+ Без фото</Txt>
           </Pressable>
         </View>
         {picked && loaded && meals.length === 0 && (

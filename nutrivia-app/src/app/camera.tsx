@@ -99,7 +99,7 @@ export default function Camera() {
                 accessibilityState={{ checked: on }}
                 onPress={() => { Haptics.selectionAsync(); setMode(m); }}
                 style={[styles.mode, on && { backgroundColor: '#FFFFFF' }]}>
-                <Txt style={{ fontFamily: font.semibold, fontSize: 14, color: on ? '#0B0D0C' : '#FFFFFF' }}>
+                <Txt style={{ fontFamily: font.semibold, fontSize: 14, color: on ? '#0E0C16' : '#FFFFFF' }}>
                   {m === 'food' ? 'Еда' : 'Холодильник'}
                 </Txt>
               </Pressable>

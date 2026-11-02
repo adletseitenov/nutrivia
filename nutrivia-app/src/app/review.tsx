@@ -197,13 +197,13 @@ export default function Review() {
                   );
                 })}
                 <Pressable accessibilityRole="button" onPress={() => setAdding(true)} style={styles.add}>
-                  <Icon name="plus" size={18} color={c.greenText} strokeWidth={2} />
-                  <Txt style={{ fontFamily: font.semibold, fontSize: 15, color: c.greenText }}>Добавить блюдо</Txt>
+                  <Icon name="plus" size={18} color={c.accentText} strokeWidth={2} />
+                  <Txt style={{ fontFamily: font.semibold, fontSize: 15, color: c.accentText }}>Добавить блюдо</Txt>
                 </Pressable>
               </View>
 
-              <View style={[styles.note, { backgroundColor: c.greenTint }]}>
-                <Icon name="clock" size={20} color={c.greenText} />
+              <View style={[styles.note, { backgroundColor: c.accentTint }]}>
+                <Icon name="clock" size={20} color={c.accentText} />
                 <Txt variant="caption" style={{ flex: 1, fontSize: 14, lineHeight: 20 }}>
                   {phase.meal.night
                     ? 'Это оценка по фото. Сейчас ночь — нутрициолог проверит разбор утром после 9:00.'

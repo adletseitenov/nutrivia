@@ -31,7 +31,7 @@ export function CalorieRing({ consumed, target, size = 180 }: { consumed: number
       style={{ width: size, height: size }}
       accessible
       accessibilityLabel={`${left >= 0 ? 'Осталось' : 'Сверх ориентира'} ${fmt(Math.abs(left))} ккал из ${fmt(target)}`}>
-      <Arc size={size} stroke={14} value={consumed / target} color={c.green} track={c.track} />
+      <Arc size={size} stroke={14} value={consumed / target} color={c.accent} track={c.track} />
       <View style={[StyleSheet.absoluteFill, styles.center]}>
         <Txt variant="numberXl">{fmt(Math.abs(left))}</Txt>
         <Txt variant="caption" tone="muted" center style={{ maxWidth: size - 48 }}>

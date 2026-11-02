@@ -65,7 +65,7 @@ export default function RoleScreen() {
               <View
                 style={[
                   styles.radio,
-                  on ? { backgroundColor: c.green, borderWidth: 6, borderColor: c.onInk } : { borderWidth: 1.75, borderColor: c.muted },
+                  on ? { backgroundColor: c.accent, borderWidth: 6, borderColor: c.onInk } : { borderWidth: 1.75, borderColor: c.muted },
                 ]}
               />
             </Pressable>

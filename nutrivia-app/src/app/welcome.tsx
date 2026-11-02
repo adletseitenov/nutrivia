@@ -79,7 +79,7 @@ const styles = StyleSheet.create({
   pill: { position: 'absolute', top: space[4], left: space[4] },
   float: {
     position: 'absolute', left: space[5], right: space[5], bottom: 0, borderRadius: radius.m, padding: space[4], gap: space[2],
-    shadowColor: '#0B0D0C', shadowOpacity: 0.12, shadowRadius: 20, shadowOffset: { width: 0, height: 12 }, elevation: 6,
+    shadowColor: '#0E0C16', shadowOpacity: 0.12, shadowRadius: 20, shadowOffset: { width: 0, height: 12 }, elevation: 6,
   },
   row: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' },
 });
