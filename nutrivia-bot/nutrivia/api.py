@@ -25,6 +25,7 @@ from .config import ALMATY, Config, load_config
 from .db import Database
 from .engine import DishBase
 from .matcher import normalize
+from .ratelimit import RateLimiter
 from .service import Service
 from .vision import VisionProvider, make_vision
 
@@ -83,6 +84,16 @@ def make_sms() -> SmsProvider:
     raise RuntimeError(f"SMS_PROVIDER={provider} ещё не подключён")
 
 
+PWA_HEAD = (
+    '<link rel="manifest" href="/manifest.webmanifest">'
+    '<link rel="apple-touch-icon" href="/apple-touch-icon.png">'
+    '<meta name="theme-color" content="#6B4EFF">'
+    '<meta name="apple-mobile-web-app-capable" content="yes">'
+    '<meta name="apple-mobile-web-app-title" content="Nutrivia">'
+    '<meta name="apple-mobile-web-app-status-bar-style" content="default">'
+)
+
+
 def create_app(cfg: Config | None = None, vision: VisionProvider | None = None, db_path: str | None = None,
                sms: SmsProvider | None = None) -> FastAPI:
     cfg = cfg or load_config()
@@ -106,7 +117,25 @@ def create_app(cfg: Config | None = None, vision: VisionProvider | None = None, 
         await app.state.notifier.close()
         await db.close()
 
-    app = FastAPI(title="Nutrivia API", version="0.2.0", lifespan=lifespan)
+    app = FastAPI(title="Nutrivia API", version="0.3.0", lifespan=lifespan)
+    limiter = RateLimiter()
+
+    @app.middleware("http")
+    async def guard(request: Request, call_next):
+        """Частота запросов + заголовки безопасности на каждый ответ."""
+        auth = request.headers.get("authorization", "")
+        ip = request.headers.get("cf-connecting-ip") or (request.client.host if request.client else "?")
+        wait = limiter.check(request.url.path, request.method, ip, auth[7:] if auth.startswith("Bearer ") else None)
+        if wait is not None:
+            resp = JSONResponse({"code": "too_many", "message": "Слишком много запросов. Попробуйте чуть позже.",
+                                 "retry_after": wait}, status_code=429, headers={"Retry-After": str(wait)})
+        else:
+            resp = await call_next(request)
+        resp.headers.setdefault("X-Content-Type-Options", "nosniff")
+        resp.headers.setdefault("Referrer-Policy", "no-referrer")
+        resp.headers.setdefault("X-Frame-Options", "DENY")
+        resp.headers.setdefault("Permissions-Policy", "camera=(self), geolocation=(), microphone=()")
+        return resp
 
     @app.exception_handler(AuthError)
     async def auth_error(_: Request, e: AuthError):
@@ -335,6 +364,15 @@ def create_app(cfg: Config | None = None, vision: VisionProvider | None = None, 
             raise AuthError(status, message, code)
         return await svc.pro_meal_view(pro["tg_id"], meal_id)
 
+    @app.get("/v1/users/me/export")
+    async def export_me(svc: Svc, user: User):
+        """Все мои данные одним файлом: профиль, приёмы пищи с блюдами, вес. Фото — по ссылкам /v1/meals/{id}/photo."""
+        from fastapi.responses import Response
+        import json as _json
+        data = await svc.export_user(user["tg_id"])
+        return Response(_json.dumps(data, ensure_ascii=False, indent=2), media_type="application/json",
+                        headers={"Content-Disposition": "attachment; filename=nutrivia-my-data.json"})
+
     @app.delete("/v1/users/me", status_code=204)
     async def delete_me(svc: Svc, user: User):
         await app.state.auth.forget_user(user["tg_id"])
@@ -558,7 +596,15 @@ def create_app(cfg: Config | None = None, vision: VisionProvider | None = None, 
             if path and f.is_file() and f.is_relative_to(root):
                 return FileResponse(f)
             # Маршруты приложения (/today, /meal…) — одна страница, роутер разберётся сам
-            return FileResponse(root / "index.html", headers={"Cache-Control": "no-cache"})
+            from fastapi.responses import HTMLResponse
+            return HTMLResponse(index_html(), headers={"Cache-Control": "no-cache"})
+
+        def index_html() -> str:
+            """index.html экспорта + теги «как приложение» на экране «Домой» (PWA, iPhone)."""
+            html = (root / "index.html").read_text(encoding="utf-8")
+            if 'rel="manifest"' in html or not (root / "manifest.webmanifest").is_file():
+                return html
+            return html.replace("</head>", PWA_HEAD + "</head>", 1)
 
     return app
 

@@ -134,6 +134,10 @@ class Database:
             Path(self.path).parent.mkdir(parents=True, exist_ok=True)
         self.conn = await aiosqlite.connect(self.path)
         self.conn.row_factory = aiosqlite.Row
+        if self.path != ":memory:":
+            # WAL: чтение не ждёт записи, бот и API могут работать с одной базой; бэкап — scripts/backup.py
+            await self.conn.execute("PRAGMA journal_mode=WAL")
+            await self.conn.execute("PRAGMA busy_timeout=5000")
         await self.conn.executescript(SCHEMA)
         cols = {r[1] for r in await (await self.conn.execute("PRAGMA table_info(users)")).fetchall()}
         if "channel" not in cols:  # БД, созданная до появления приложения

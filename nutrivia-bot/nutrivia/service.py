@@ -269,6 +269,24 @@ class Service:
         low = text.lower()
         return any(w in low for w in HEALTH_WORDS)
 
+    async def export_user(self, tg_id: int) -> dict:
+        """Выгрузка данных человека (право на доступ к своим данным)."""
+        user = dict(await self.db.get_user(tg_id))
+        meals = []
+        for r in await self.db.fetchall("SELECT id FROM meals WHERE user_id = ? ORDER BY received_at", (tg_id,)):
+            m = await self.meal_view(r["id"], tg_id)
+            m["received_at"] = datetime.fromtimestamp(m["received_at"], ALMATY).isoformat()
+            meals.append(m)
+        weights = await self.db.fetchall("SELECT ts, kg FROM weights WHERE user_id = ? ORDER BY ts", (tg_id,))
+        keep = ("role", "goal", "lang", "sex", "birth_year", "height_cm", "weight_kg", "activity", "kcal_target")
+        return {
+            "exported_at": datetime.fromtimestamp(self.db.clock(), ALMATY).isoformat(),
+            "profile": {k: user.get(k) for k in keep},
+            "joined_at": datetime.fromtimestamp(user["joined_at"], ALMATY).isoformat(),
+            "meals": meals,
+            "weights": [{"at": datetime.fromtimestamp(w["ts"], ALMATY).isoformat(), "kg": w["kg"]} for w in weights],
+        }
+
     async def delete_user(self, tg_id: int) -> None:
         for path in await self.db.delete_user(tg_id):
             Path(path).unlink(missing_ok=True)

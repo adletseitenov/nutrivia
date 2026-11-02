@@ -1,0 +1,37 @@
+# Nutrivia на сервере: API + веб-версия на одном адресе + ежедневный бэкап.
+# 1) cd nutrivia-app && npm ci && npx expo export -p web --output-dir dist
+# 2) заполнить nutrivia-bot/.env (см. .env.example): AUTH_SECRET, VISION_PROVIDER, ключи, ADMIN_TOKEN, AI_DAILY_USD
+# 3) docker compose up -d --build   → http://сервер:8000 (HTTPS — через Caddy/nginx/Cloudflare перед ним)
+services:
+  api:
+    build: ./nutrivia-bot
+    env_file: ./nutrivia-bot/.env
+    environment:
+      DB_PATH: /data/nutrivia.db
+      PHOTOS_DIR: /data/photos
+      WEB_DIR: /web
+    volumes:
+      - data:/data
+      - ./nutrivia-app/dist:/web:ro
+    ports:
+      - "8000:8000"
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://localhost:8000/health')"]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+
+  backup:
+    build: ./nutrivia-bot
+    env_file: ./nutrivia-bot/.env
+    environment:
+      DB_PATH: /data/nutrivia.db
+      PHOTOS_DIR: /data/photos
+    volumes:
+      - data:/data
+    command: sh -c "while true; do python -m scripts.backup /data/backups 14; sleep 86400; done"
+    restart: unless-stopped
+
+volumes:
+  data:

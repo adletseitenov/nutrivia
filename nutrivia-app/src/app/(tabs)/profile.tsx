@@ -1,8 +1,8 @@
 import { router } from 'expo-router';
 import { useEffect, useState } from 'react';
-import { Pressable, StyleSheet, View } from 'react-native';
+import { Platform, Pressable, Share, StyleSheet, View } from 'react-native';
 
-import { bodyFromMe, deleteMe, logout } from '@/api/client';
+import { bodyFromMe, deleteMe, exportMe, logout } from '@/api/client';
 import { Icon } from '@/components/icon';
 import { Screen } from '@/components/screen';
 import { Txt } from '@/components/txt';
@@ -19,6 +19,23 @@ export default function Profile() {
   const goal = GOALS.find((g) => g.id === state.goal)!;
   const body = bodyFromMe(state.me);
   const [reminders, setRemindersState] = useState<boolean | null>(null);
+
+  async function downloadData() {
+    try {
+      const json = await exportMe();
+      if (Platform.OS === 'web') {
+        const a = Object.assign(document.createElement('a'), {
+          href: URL.createObjectURL(new Blob([json], { type: 'application/json' })),
+          download: 'nutrivia-my-data.json',
+        });
+        a.click();
+      } else {
+        await Share.share({ message: json, title: 'Мои данные Nutrivia' });
+      }
+    } catch {
+      // нет связи — человек нажмёт ещё раз
+    }
+  }
 
   useEffect(() => {
     if (REMINDERS_SUPPORTED) remindersOn().then(setRemindersState, () => setRemindersState(false));
@@ -78,6 +95,19 @@ export default function Profile() {
         style={[styles.danger, { backgroundColor: c.surface }]}>
         <Txt variant="headline" style={{ fontSize: 15 }}>Выйти</Txt>
       </Pressable>
+      <View style={[styles.group, { backgroundColor: c.surface }]}>
+        {([
+          ['Мои данные', 'Скачать', downloadData],
+          ['Конфиденциальность', '', () => router.push({ pathname: '/legal', params: { doc: 'privacy' } })],
+          ['Условия использования', '', () => router.push({ pathname: '/legal', params: { doc: 'terms' } })],
+        ] as const).map(([label, value, onPress], i) => (
+          <Pressable key={label} accessibilityRole="button" onPress={onPress}
+            style={[styles.row, i > 0 && { borderTopWidth: StyleSheet.hairlineWidth, borderTopColor: c.line }]}>
+            <Txt style={{ fontSize: 15 }}>{label}</Txt>
+            <Txt variant="caption" tone="muted">{value || '›'}</Txt>
+          </Pressable>
+        ))}
+      </View>
       <Txt variant="caption" tone="muted">
         Удалить аккаунт и все фото можно в любой момент — данные стираются с сервера полностью.
       </Txt>

@@ -18,7 +18,7 @@ import { palette } from '@/theme/tokens';
 SplashScreen.preventAutoHideAsync();
 
 // Экраны, куда без входа нельзя
-const PUBLIC = new Set(['index', 'welcome', 'role', 'goal', 'body', 'pro-name', 'phone', 'code']);
+const PUBLIC = new Set(['index', 'welcome', 'role', 'goal', 'body', 'pro-name', 'phone', 'code', 'legal']);
 
 /** Сессия сброшена (вышли, истекла, сервер ответил 401) — с закрытого экрана уводим на вход. */
 function SessionGuard() {
@@ -70,6 +70,7 @@ export default function RootLayout() {
           <Stack.Screen name="meal" />
           <Stack.Screen name="manual" />
           <Stack.Screen name="weight" />
+          <Stack.Screen name="legal" />
           <Stack.Screen name="streak" />
           <Stack.Screen name="fridge" />
         </Stack>

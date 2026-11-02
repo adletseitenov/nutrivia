@@ -25,7 +25,13 @@ export default function Welcome() {
           <Txt variant="caption" tone="muted" center style={{ fontSize: 12, lineHeight: 16 }}>
             Нажимая «Начать» или «Войти», вы подтверждаете, что вам есть 18 лет, и соглашаетесь, что мы храним ваши фото еды и
             разборы и показываем их нутрициологу. Разбор — оценка по фото, не медицинская консультация. Удалить все
-            данные можно в профиле.
+            данные можно в профиле.{' '}
+            <Txt variant="caption" tone="accent" style={{ fontSize: 12, lineHeight: 16 }} onPress={() => router.push({ pathname: '/legal', params: { doc: 'privacy' } })}>
+              Конфиденциальность
+            </Txt>{' · '}
+            <Txt variant="caption" tone="accent" style={{ fontSize: 12, lineHeight: 16 }} onPress={() => router.push({ pathname: '/legal', params: { doc: 'terms' } })}>
+              Условия
+            </Txt>
           </Txt>
           <Button title="Начать" block onPress={() => router.push('/role')} />
           <Pressable

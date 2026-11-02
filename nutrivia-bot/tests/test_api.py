@@ -444,14 +444,15 @@ def test_sms_start_reports_delivery(client):
 def test_serves_web_app(tmp_path, monkeypatch):
     web = tmp_path / "web"
     (web / "_expo").mkdir(parents=True)
-    (web / "index.html").write_text("<html>app</html>")
+    (web / "index.html").write_text("<html><head></head>app</html>")
+    (web / "manifest.webmanifest").write_text("{}")
     (web / "_expo" / "app.js").write_text("js")
     (tmp_path / "secret.txt").write_text("nope")
     monkeypatch.setenv("WEB_DIR", str(web))
     cfg = Config(solo_review_chat_id=-100, photos_dir=str(tmp_path / "p"), bot_token="")
     with TestClient(create_app(cfg, vision=FakeVision(), db_path=":memory:", sms=ConsoleSms())) as c:
-        assert c.get("/").text == "<html>app</html>"
-        assert c.get("/today").text == "<html>app</html>"  # маршрут приложения
+        assert "app</html>" in c.get("/").text and 'rel="manifest"' in c.get("/").text  # PWA-теги
+        assert "app</html>" in c.get("/today").text  # маршрут приложения
         assert c.get("/_expo/app.js").text == "js"
         assert c.get("/../secret.txt").text != "nope"
         assert c.get("/health").json() == {"ok": True}  # API не перекрыт
@@ -663,3 +664,29 @@ def test_daily_ai_budget(client):
     assert m["status"] == "draft" and m["items"] == []  # модель не звали — черновик заполнит человек
     assert client.post("/v1/fridge", headers=h, files={"photo": ("f.jpg", JPEG, "image/jpeg")}).json()["code"] == "budget"
     svc.cfg.ai_daily_usd = 0
+
+
+def test_rate_limit_on_login(client):
+    from nutrivia.ratelimit import RateLimiter
+    t = [0.0]
+    rl = RateLimiter(rules=(("/v1/auth/", "POST", 3, 60, "ip"),), clock=lambda: t[0])
+    assert [rl.check("/v1/auth/sms/start", "POST", "1.1.1.1", None) for _ in range(3)] == [None, None, None]
+    assert rl.check("/v1/auth/sms/start", "POST", "1.1.1.1", None) == 61
+    assert rl.check("/v1/auth/sms/start", "POST", "2.2.2.2", None) is None  # другой адрес
+    t[0] = 61
+    assert rl.check("/v1/auth/sms/start", "POST", "1.1.1.1", None) is None  # окно прошло
+    # в приложении — 429 с понятным текстом
+    for _ in range(20):
+        client.post("/v1/auth/sms/start", json={"phone": "+77070000777"})
+    r = client.post("/v1/auth/sms/start", json={"phone": "+77070000778"})
+    assert r.status_code == 429 and r.json()["code"] == "too_many" and r.headers["Retry-After"]
+
+
+def test_security_headers_and_export(client):
+    h = register(client)
+    upload(client, h)
+    client.post("/v1/weights", headers=h, json={"kg": 70})
+    r = client.get("/v1/users/me/export", headers=h)
+    assert r.headers["X-Content-Type-Options"] == "nosniff" and r.headers["X-Frame-Options"] == "DENY"
+    data = r.json()
+    assert len(data["meals"]) == 1 and data["weights"][0]["kg"] == 70 and "phone" not in str(data["profile"])

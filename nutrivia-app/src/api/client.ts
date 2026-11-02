@@ -371,6 +371,14 @@ export const putItems = (id: number, items: { dish_id: string; grams: number }[]
 
 export const confirmMeal = (id: number) => request<ServerMeal>(`/v1/meals/${id}/confirm`, { method: 'POST' });
 
+/** Все мои данные одним JSON (профиль, приёмы пищи, вес). */
+export async function exportMe(): Promise<string> {
+  await loadSession();
+  const res = await fetch(`${BASE}/v1/users/me/export`, { headers: token ? { Authorization: `Bearer ${token}` } : {} });
+  if (!res.ok) throw new ApiError(res.status, 'Не получилось выгрузить данные. Попробуйте ещё раз.');
+  return res.text();
+}
+
 export async function deleteMe() {
   await request<void>('/v1/users/me', { method: 'DELETE' });
   await clearSession();
