@@ -1,11 +1,13 @@
 import { router } from 'expo-router';
+import { useEffect, useState } from 'react';
 import { Pressable, StyleSheet, View } from 'react-native';
 
 import { bodyFromMe, deleteMe, logout } from '@/api/client';
 import { Icon } from '@/components/icon';
 import { Screen } from '@/components/screen';
 import { Txt } from '@/components/txt';
-import { fmt } from '@/engine/engine';
+import { fmt, kgText } from '@/engine/engine';
+import { REMINDERS_SUPPORTED, remindersOn, setReminders } from '@/lib/reminders';
 import { GOALS, useAppStore, useTargets } from '@/store/app-store';
 import { font, radius, space } from '@/theme/tokens';
 import { useColors } from '@/theme/use-colors';
@@ -16,12 +18,17 @@ export default function Profile() {
   const t = useTargets();
   const goal = GOALS.find((g) => g.id === state.goal)!;
   const body = bodyFromMe(state.me);
+  const [reminders, setRemindersState] = useState<boolean | null>(null);
+
+  useEffect(() => {
+    if (REMINDERS_SUPPORTED) remindersOn().then(setRemindersState, () => setRemindersState(false));
+  }, []);
 
   const rows: { label: string; value: string; onPress?: () => void }[] = [
     { label: 'Цель', value: goal.title, onPress: () => router.push('/goal') },
     {
       label: 'Параметры',
-      value: body ? `${body.heightCm} см · ${body.weightKg} кг` : 'Указать',
+      value: body ? `${body.heightCm} см · ${kgText(body.weightKg)} кг` : 'Указать',
       onPress: () => router.push('/body'),
     },
     { label: 'Ориентир на день', value: `${fmt(t.kcal)} ккал${state.me?.targets?.set_by_pro ? ' · от специалиста' : ''}` },
@@ -29,6 +36,13 @@ export default function Profile() {
       ? { label: 'Тренер или нутрициолог', value: state.me.coach.name }
       : { label: 'Тренер или нутрициолог', value: 'Ввести код', onPress: () => router.push('/join') },
     { label: 'Язык', value: 'Русский' },
+    ...(REMINDERS_SUPPORTED
+      ? [{
+          label: 'Напоминания о еде',
+          value: reminders === null ? '…' : reminders ? '9:00 · 13:30 · 19:00' : 'Выключены',
+          onPress: () => setReminders(!reminders).then(setRemindersState, () => {}),
+        }]
+      : []),
   ];
 
   return (

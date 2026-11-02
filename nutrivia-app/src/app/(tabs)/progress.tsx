@@ -1,9 +1,11 @@
 import { useFocusEffect } from 'expo-router';
-import { useCallback } from 'react';
+import { useCallback, useState } from 'react';
 import { ActivityIndicator, StyleSheet, View } from 'react-native';
 
+import { getWeights, type ServerWeights } from '@/api/client';
 import { Screen } from '@/components/screen';
 import { Txt } from '@/components/txt';
+import { WeightCard } from '@/components/weight-card';
 import { fmt } from '@/engine/engine';
 import { rangeLabel, WEEKDAYS_SHORT } from '@/lib/dates';
 import { refreshToday, useAppStore } from '@/store/app-store';
@@ -16,10 +18,12 @@ const CHART_H = 160;
 export default function Progress() {
   const c = useColors();
   const { state, dispatch } = useAppStore();
+  const [weights, setWeights] = useState<ServerWeights | null>(null);
 
   useFocusEffect(
     useCallback(() => {
       refreshToday(dispatch);
+      getWeights().then(setWeights, () => {});
     }, [dispatch]),
   );
 
@@ -104,6 +108,8 @@ export default function Progress() {
           </View>
         ))}
       </View>
+
+      <WeightCard data={weights} />
 
       <View style={[styles.comment, { backgroundColor: c.surface }]}>
         <View style={styles.coach}>

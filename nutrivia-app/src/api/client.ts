@@ -307,6 +307,16 @@ export const getProgress = () => request<ServerProgress>('/v1/progress');
 
 export const searchDishes = (q: string) => request<DishHit[]>(`/v1/dishes?q=${encodeURIComponent(q)}`);
 
+/** Что человек ест чаще всего за месяц — сверху списка «Добавить блюдо». */
+export const recentDishes = () => request<DishHit[]>('/v1/dishes/recent');
+
+export type ServerWeights = { points: { date: string; kg: number }[]; change: number | null };
+
+export const getWeights = () => request<ServerWeights>('/v1/weights');
+
+export const addWeight = (kg: number, date?: string) =>
+  request<{ weights: ServerWeights; me: Me }>('/v1/weights', { method: 'POST', ...json({ kg, date }) });
+
 export const putItems = (id: number, items: { dish_id: string; grams: number }[]) =>
   request<ServerMeal>(`/v1/meals/${id}/items`, { method: 'PUT', ...json({ items }) });
 

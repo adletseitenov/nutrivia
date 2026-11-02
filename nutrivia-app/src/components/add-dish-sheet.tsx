@@ -2,7 +2,7 @@ import { useEffect, useState } from 'react';
 import { ActivityIndicator, FlatList, Modal, Pressable, StyleSheet, TextInput, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
-import { searchDishes, type DishHit } from '@/api/client';
+import { recentDishes, searchDishes, type DishHit } from '@/api/client';
 import { fmt } from '@/engine/engine';
 import { font, radius, space } from '@/theme/tokens';
 import { useColors } from '@/theme/use-colors';
@@ -27,8 +27,14 @@ export function AddDishSheet({ visible, onClose, onPick }: {
     if (!visible) return;
     // Небольшая задержка, чтобы не слать запрос на каждую букву
     const timer = setTimeout(() => {
-      searchDishes(q.trim()).then(
-        (r) => { setHits(r); setFailed(false); },
+      const query = q.trim();
+      // Пустой поиск: сначала то, что человек ест чаще всего, потом вся база
+      Promise.all([searchDishes(query), query ? Promise.resolve([]) : recentDishes().catch(() => [])]).then(
+        ([found, recent]) => {
+          const seen = new Set(recent.map((d) => d.id));
+          setHits([...recent, ...found.filter((d) => !seen.has(d.id))]);
+          setFailed(false);
+        },
         () => setFailed(true),
       );
     }, 250);

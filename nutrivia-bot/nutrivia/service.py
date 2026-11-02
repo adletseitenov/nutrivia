@@ -397,6 +397,35 @@ class Service:
         await self.db.log_event("meal_deleted", user_id, meal_id=meal_id, status=meal["status"])
         return True
 
+    # --- вес (приложение) ---
+    async def add_weight(self, user_id: int, kg: float, ts: int | None = None) -> None:
+        """Взвешивание. Одно на день: повторное в тот же день заменяет прежнее.
+        Последний вес становится весом профиля — личная норма пересчитывается сама."""
+        ts = ts or self.db.clock()
+        start, end = local_day_bounds(ts)
+        await self.db.execute("DELETE FROM weights WHERE user_id = ? AND ts >= ? AND ts < ?", (user_id, start, end))
+        await self.db.execute("INSERT INTO weights (user_id, ts, kg) VALUES (?, ?, ?)", (user_id, ts, round(kg, 1)))
+        last = await self.db.fetchone("SELECT kg FROM weights WHERE user_id = ? ORDER BY ts DESC LIMIT 1", (user_id,))
+        await self.db.update_user(user_id, weight_kg=last["kg"])
+        await self.db.log_event("weight", user_id, channel="app")
+
+    async def weights_view(self, user_id: int, days: int = 90) -> dict:
+        since = self.db.clock() - days * 86400
+        rows = await self.db.fetchall(
+            "SELECT ts, kg FROM weights WHERE user_id = ? AND ts >= ? ORDER BY ts", (user_id, since))
+        points = [{"date": datetime.fromtimestamp(r["ts"], ALMATY).date().isoformat(), "kg": r["kg"]} for r in rows]
+        first, last = (points[0]["kg"], points[-1]["kg"]) if points else (None, None)
+        return {"points": points, "change": round(last - first, 1) if points else None}
+
+    async def recent_dishes(self, user_id: int, limit: int = 8) -> list[str]:
+        """Что человек ест чаще всего за последний месяц — для быстрого выбора без поиска."""
+        rows = await self.db.fetchall(
+            "SELECT i.dish_id, COUNT(*) AS n, MAX(m.received_at) AS last FROM meal_items i JOIN meals m ON m.id = i.meal_id"
+            " WHERE m.user_id = ? AND m.received_at >= ? AND i.dish_id IS NOT NULL AND m.status != 'failed'"
+            " GROUP BY i.dish_id ORDER BY n DESC, last DESC LIMIT ?",
+            (user_id, self.db.clock() - 30 * 86400, limit))
+        return [r["dish_id"] for r in rows if self.base.get(r["dish_id"])]
+
     async def app_confirm(self, meal_id: int, user_id: int) -> bool:
         meal = await self.db.fetchone("SELECT * FROM meals WHERE id = ? AND user_id = ?", (meal_id, user_id))
         if meal is None or meal["status"] == "failed":

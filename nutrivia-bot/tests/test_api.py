@@ -541,3 +541,34 @@ def test_operator_reviews_clients_without_coach(client):
     assert seen["status"] == "reviewed" and seen["reviewer"] == {"name": "Нутрициолог Nutrivia", "role": "operator"}
     # обычный клиент в кабинет не попадает
     assert client.get("/v1/pro/queue", headers=h_solo).status_code == 403
+
+
+def test_weights_update_profile_and_targets(client):
+    h = register(client)
+    client.patch("/v1/me", headers=h, json={"sex": "f", "birth_year": 1996, "height_cm": 165, "weight_kg": 80, "activity": "light"})
+    before = client.get("/v1/me", headers=h).json()["targets"]["kcal"]
+    from datetime import datetime, timedelta
+    from nutrivia.config import ALMATY
+    week_ago = (datetime.fromtimestamp(time.time(), ALMATY) - timedelta(days=7)).date().isoformat()
+    client.post("/v1/weights", headers=h, json={"kg": 80, "date": week_ago})
+    r = client.post("/v1/weights", headers=h, json={"kg": 78.4}).json()
+    assert r["weights"]["change"] == -1.6 and len(r["weights"]["points"]) == 2
+    assert r["me"]["profile"]["weight_kg"] == 78.4
+    assert r["me"]["targets"]["kcal"] <= before
+    # повтор в тот же день заменяет
+    client.post("/v1/weights", headers=h, json={"kg": 78.0})
+    assert [p["kg"] for p in client.get("/v1/weights", headers=h).json()["points"]] == [80.0, 78.0]
+    assert client.post("/v1/weights", headers=h, json={"kg": 10}).status_code == 422
+    # удаление аккаунта стирает и вес
+    uid = client.get("/v1/me", headers=h).json()["user_id"]
+    assert client.delete("/v1/users/me", headers=h).status_code == 204
+    n = client.portal.call(client.app.state.svc.db.fetchone, "SELECT COUNT(*) AS n FROM weights WHERE user_id = ?", (uid,))
+    assert n["n"] == 0
+
+
+def test_recent_dishes(client):
+    h = register(client)
+    for _ in range(2):
+        client.post("/v1/meals/manual", headers=h, json={"items": [{"dish_id": "oatmeal", "grams": 250}]})
+    client.post("/v1/meals/manual", headers=h, json={"items": [{"dish_id": "plov", "grams": 300}]})
+    assert [d["id"] for d in client.get("/v1/dishes/recent", headers=h).json()] == ["oatmeal", "plov"]

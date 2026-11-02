@@ -395,6 +395,27 @@ def create_app(cfg: Config | None = None, vision: VisionProvider | None = None, 
         """Серия дней, стадия маскота и неделя для экранов «Серия» и «Прогресс»."""
         return {"streak": await svc.streak_view(user["tg_id"]), "week": await svc.week_view(user["tg_id"])}
 
+    class WeightIn(BaseModel):
+        kg: float = Field(ge=35, le=300)
+        date: str | None = Field(default=None, pattern=r"^\d{4}-\d{2}-\d{2}$")
+
+    @app.post("/v1/weights")
+    async def add_weight(body: WeightIn, svc: Svc, user: User):
+        ts = day_ts(body.date, svc)
+        await svc.add_weight(user["tg_id"], body.kg, min(ts, svc.db.clock()) if ts else None)
+        return {"weights": await svc.weights_view(user["tg_id"]), "me": await svc.me_view(user["tg_id"])}
+
+    @app.get("/v1/weights")
+    async def weights(svc: Svc, user: User):
+        return await svc.weights_view(user["tg_id"])
+
+    def dish_hit(d):
+        return {"id": d.id, "name": d.name_ru, "unit": d.unit, "unit_grams": d.unit_grams, "kcal_100g": d.kcal}
+
+    @app.get("/v1/dishes/recent")
+    async def recent_dishes(svc: Svc, user: User):
+        return [dish_hit(svc.base.get(i)) for i in await svc.recent_dishes(user["tg_id"])]
+
     @app.get("/v1/dishes")
     async def dishes(svc: Svc, q: Annotated[str, Query(max_length=64)] = ""):
         """Поиск блюда для «Добавить блюдо»: та же база, что у Engine."""
@@ -406,8 +427,7 @@ def create_app(cfg: Config | None = None, vision: VisionProvider | None = None, 
             found = process.extract(normalize(q), {k: normalize(v) for k, v in names.items()},
                                     scorer=fuzz.WRatio, limit=10, score_cutoff=60)
             hits = [svc.base.get(k) for _, _, k in found]
-        return [{"id": d.id, "name": d.name_ru, "unit": d.unit, "unit_grams": d.unit_grams,
-                 "kcal_100g": d.kcal} for d in hits]
+        return [dish_hit(d) for d in hits]
 
     # Веб-версия приложения (WEB_DIR = результат `expo export -p web`): тот же адрес, что и API
     web_dir = os.environ.get("WEB_DIR")

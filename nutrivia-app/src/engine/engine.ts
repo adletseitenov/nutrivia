@@ -72,6 +72,11 @@ export function portionText(dish: Dish, grams: number): string {
 }
 
 /** Целые числа с пробелом по тысячам: 1 248. */
+/** 69.8 → «69,8» (десятичная запятая) */
+export function kgText(kg: number) {
+  return String(Math.round(kg * 10) / 10).replace('.', ',');
+}
+
 export function fmt(n: number): string {
   return Math.round(n)
     .toString()

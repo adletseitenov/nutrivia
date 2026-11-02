@@ -68,6 +68,7 @@ export default function RootLayout() {
           <Stack.Screen name="review" />
           <Stack.Screen name="meal" />
           <Stack.Screen name="manual" />
+          <Stack.Screen name="weight" />
           <Stack.Screen name="streak" />
           <Stack.Screen name="fridge" />
         </Stack>

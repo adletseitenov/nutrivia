@@ -84,6 +84,13 @@ CREATE TABLE IF NOT EXISTS jobs_done (
     key TEXT PRIMARY KEY,
     ts INTEGER NOT NULL
 );
+CREATE TABLE IF NOT EXISTS weights (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    user_id INTEGER NOT NULL,
+    ts INTEGER NOT NULL,
+    kg REAL NOT NULL
+);
+CREATE INDEX IF NOT EXISTS idx_weights_user ON weights(user_id, ts);
 CREATE INDEX IF NOT EXISTS idx_meals_user ON meals(user_id, received_at);
 CREATE INDEX IF NOT EXISTS idx_events_name ON events(name, ts);
 """
@@ -171,6 +178,7 @@ class Database:
             marks = ",".join("?" * len(ids))
             await self.execute(f"DELETE FROM meal_items WHERE meal_id IN ({marks})", tuple(ids))
         await self.execute("DELETE FROM meals WHERE user_id = ?", (tg_id,))
+        await self.execute("DELETE FROM weights WHERE user_id = ?", (tg_id,))
         await self.execute("DELETE FROM users WHERE tg_id = ?", (tg_id,))
         # специалист: ученики остаются, но отвязываются; код приглашения перестаёт работать
         pro = await self.fetchone("SELECT code FROM pros WHERE user_id = ?", (tg_id,))

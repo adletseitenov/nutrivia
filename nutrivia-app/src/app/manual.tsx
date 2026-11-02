@@ -41,7 +41,8 @@ export default function Manual() {
     try {
       await addManualMeal(parsed.map((r) => ({ dish_id: r.dishId, grams: r.g })), date);
       refreshToday(dispatch);
-      router.back();
+      if (router.canGoBack()) router.back();
+      else router.replace("/today");
     } catch (e) {
       setError(e instanceof ApiError ? e.message : 'Не получилось сохранить. Попробуйте ещё раз.');
       setSaving(false);
