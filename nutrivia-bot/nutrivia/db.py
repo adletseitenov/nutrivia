@@ -120,6 +120,14 @@ CREATE TABLE IF NOT EXISTS post_reports (
     ts INTEGER NOT NULL,
     PRIMARY KEY (post_id, user_id)
 );
+CREATE TABLE IF NOT EXISTS payments (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    user_id INTEGER NOT NULL,
+    ts INTEGER NOT NULL,
+    amount_kzt INTEGER NOT NULL,
+    status TEXT NOT NULL DEFAULT 'pending',  -- pending | confirmed | rejected
+    decided_at INTEGER
+);
 CREATE TABLE IF NOT EXISTS pro_notes (
     student_id INTEGER NOT NULL,
     pro_id INTEGER NOT NULL,
@@ -169,7 +177,7 @@ class Database:
             await self.conn.execute("ALTER TABLE meals ADD COLUMN photo_hash TEXT")  # то же фото второй раз не оплачиваем
         # Параметры для личной нормы калорий (приложение)
         for col, kind in (("sex", "TEXT"), ("birth_year", "INTEGER"), ("height_cm", "REAL"),
-                          ("weight_kg", "REAL"), ("activity", "TEXT")):
+                          ("weight_kg", "REAL"), ("activity", "TEXT"), ("paid_until", "INTEGER")):
             if col not in cols:
                 await self.conn.execute(f"ALTER TABLE users ADD COLUMN {col} {kind}")
         await self.conn.commit()
@@ -228,6 +236,7 @@ class Database:
         await self.execute("DELETE FROM post_reports WHERE user_id = ? OR post_id IN (SELECT id FROM posts WHERE user_id = ?)",
                            (tg_id, tg_id))
         await self.execute("DELETE FROM posts WHERE user_id = ?", (tg_id,))
+        await self.execute("DELETE FROM payments WHERE user_id = ?", (tg_id,))
         await self.execute("DELETE FROM users WHERE tg_id = ?", (tg_id,))
         # специалист: ученики остаются, но отвязываются; код приглашения перестаёт работать
         pro = await self.fetchone("SELECT code FROM pros WHERE user_id = ?", (tg_id,))

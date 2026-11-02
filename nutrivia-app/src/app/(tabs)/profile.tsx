@@ -2,7 +2,7 @@ import { router } from 'expo-router';
 import { useEffect, useState } from 'react';
 import { Platform, Pressable, Share, StyleSheet, View } from 'react-native';
 
-import { bodyFromMe, deleteMe, exportMe, logout, patchLang } from '@/api/client';
+import { bodyFromMe, deleteMe, exportMe, getSubscription, logout, patchLang, type Subscription } from '@/api/client';
 import { Icon } from '@/components/icon';
 import { Screen } from '@/components/screen';
 import { Txt } from '@/components/txt';
@@ -21,6 +21,12 @@ export default function Profile() {
   const goal = GOALS.find((g) => g.id === state.goal)!;
   const body = bodyFromMe(state.me);
   const [reminders, setRemindersState] = useState<boolean | null>(null);
+  const [subscription, setSubscription] = useState<Subscription | null>(null);
+  useEffect(() => {
+    getSubscription().then(setSubscription, () => {});
+  }, []);
+  const sub = !subscription ? '…' : subscription.status === 'active' ? t('Активна')
+    : subscription.status === 'trial' ? `${t('Пробный')}: ${subscription.days_left} ${t('дн.')}` : t('Закончилась');
 
   async function downloadData() {
     try {
@@ -50,6 +56,7 @@ export default function Profile() {
       value: body ? `${body.heightCm} см · ${kgText(body.weightKg)} кг` : 'Указать',
       onPress: () => router.push('/body'),
     },
+    ...(state.me?.role === 'client' ? [{ label: 'Подписка', value: sub, onPress: () => router.push('/subscription') }] : []),
     { label: 'Ориентир на день', value: `${fmt(tg.kcal)} ккал${state.me?.targets?.set_by_pro ? ' · от специалиста' : ''}` },
     state.me?.coach
       ? { label: 'Тренер или нутрициолог', value: state.me.coach.name }

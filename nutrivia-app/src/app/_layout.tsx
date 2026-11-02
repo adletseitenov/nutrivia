@@ -79,6 +79,7 @@ export default function RootLayout() {
           <Stack.Screen name="manual" />
           <Stack.Screen name="weight" />
           <Stack.Screen name="legal" />
+          <Stack.Screen name="subscription" />
           <Stack.Screen name="streak" />
           <Stack.Screen name="fridge" />
         </Stack>

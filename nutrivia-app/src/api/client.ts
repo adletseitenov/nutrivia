@@ -406,6 +406,18 @@ export const getModeration = () => request<{ posts: Post[] }>('/v1/feed/moderati
 export const moderatePost = (id: number, keep: boolean) =>
   request<void>(`/v1/feed/${id}/moderate`, { method: 'POST', ...json({ keep }) });
 
+export type Subscription = {
+  status: 'trial' | 'active' | 'expired' | 'free';
+  days_left?: number;
+  until?: string;
+  price_kzt: number;
+  pay_url: string | null;
+  pending: boolean;
+  enforced: boolean;
+};
+export const getSubscription = () => request<Subscription>('/v1/subscription');
+export const claimPayment = () => request<Subscription>('/v1/subscription/claim', { method: 'POST' });
+
 export async function deleteMe() {
   await request<void>('/v1/users/me', { method: 'DELETE' });
   await clearSession();

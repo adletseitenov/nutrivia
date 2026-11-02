@@ -287,6 +287,57 @@ class Service:
             "weights": [{"at": datetime.fromtimestamp(w["ts"], ALMATY).isoformat(), "kg": w["kg"]} for w in weights],
         }
 
+    # --- подписка (Kaspi по ссылке, подтверждает команда) ---
+    PAID_DAYS = 30
+
+    async def subscription(self, user_id: int) -> dict:
+        """trial (дней осталось) | active (до даты) | expired. Специалисты и операторы — бесплатно (free)."""
+        u = await self.db.get_user(user_id)
+        now_ts = self.db.clock()
+        pending = await self.db.fetchone("SELECT 1 FROM payments WHERE user_id = ? AND status = 'pending'", (user_id,))
+        base = {"price_kzt": self.cfg.offer_price_kzt, "pay_url": self.cfg.kaspi_pay_url or None,
+                "pending": bool(pending), "enforced": self.cfg.paywall_enforce}
+        if u["role"] != "client":
+            return {**base, "status": "free"}
+        if u["paid_until"] and u["paid_until"] > now_ts:
+            return {**base, "status": "active",
+                    "until": datetime.fromtimestamp(u["paid_until"], ALMATY).date().isoformat()}
+        trial_end = u["joined_at"] + self.cfg.trial_days * 86400
+        if trial_end > now_ts:
+            return {**base, "status": "trial", "days_left": max(1, round((trial_end - now_ts) / 86400))}
+        return {**base, "status": "expired"}
+
+    async def can_upload(self, user_id: int) -> bool:
+        return not self.cfg.paywall_enforce or (await self.subscription(user_id))["status"] != "expired"
+
+    async def claim_payment(self, user_id: int) -> None:
+        """«Я оплатил» — заявка команде; одна открытая за раз."""
+        if not await self.db.fetchone("SELECT 1 FROM payments WHERE user_id = ? AND status = 'pending'", (user_id,)):
+            await self.db.execute("INSERT INTO payments (user_id, ts, amount_kzt) VALUES (?, ?, ?)",
+                                  (user_id, self.db.clock(), self.cfg.offer_price_kzt))
+            await self.db.log_event("payment_claimed", user_id)
+
+    async def decide_payment(self, payment_id: int, confirm: bool) -> bool:
+        """Админ: подтвердить (+30 дней от сегодня или от конца оплаченного) или отклонить."""
+        p = await self.db.fetchone("SELECT * FROM payments WHERE id = ? AND status = 'pending'", (payment_id,))
+        if p is None:
+            return False
+        now_ts = self.db.clock()
+        await self.db.execute("UPDATE payments SET status = ?, decided_at = ? WHERE id = ?",
+                              ("confirmed" if confirm else "rejected", now_ts, payment_id))
+        if confirm:
+            u = await self.db.get_user(p["user_id"])
+            start = max(now_ts, u["paid_until"] or 0)
+            await self.db.update_user(p["user_id"], paid_until=start + self.PAID_DAYS * 86400, paid_at=now_ts)
+            await self.db.log_event("paid", p["user_id"], channel="app", amount=p["amount_kzt"])
+        return True
+
+    async def pending_payments(self, phones: dict[int, str]) -> list[dict]:
+        rows = await self.db.fetchall("SELECT * FROM payments WHERE status = 'pending' ORDER BY ts")
+        return [{"id": r["id"], "user_id": r["user_id"], "amount_kzt": r["amount_kzt"],
+                 "phone": (lambda ph: ph[:4] + " *** ** " + ph[-4:-2] + " " + ph[-2:] if ph else "")(phones.get(r["user_id"], "")),
+                 "at": datetime.fromtimestamp(r["ts"], ALMATY).strftime("%d.%m %H:%M")} for r in rows]
+
     # --- лента ---
     async def _author_label(self, user_id: int) -> str:
         streak = await self.streak_view(user_id)

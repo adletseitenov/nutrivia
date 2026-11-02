@@ -64,6 +64,12 @@
   </section>
 
   <section class="card">
+    <h2>Оплаты на проверке</h2>
+    <p class="muted">Клиент нажал «Я оплатил». Сверьте перевод в Kaspi и подтвердите — подписка продлится на 30 дней.</p>
+    <div class="scroll"><table><thead><tr><th>когда</th><th>id</th><th>номер</th><th>сумма</th><th></th></tr></thead><tbody id="payments"></tbody></table></div>
+  </section>
+
+  <section class="card">
     <div class="row"><h2>Пользователи</h2><a href="#" id="csv" class="pill">Скачать CSV</a></div>
     <div class="scroll"><table><thead><tr><th>id</th><th>роль</th><th>номер</th><th>тренер / код</th><th>с</th><th>фото за 7 дн.</th><th>ждут</th><th>последнее</th></tr></thead><tbody id="users"></tbody></table></div>
   </section>
@@ -92,7 +98,11 @@ function show(app, err = '') {
 const fmt = (n) => n == null ? '—' : Number(n).toLocaleString('ru-RU');
 
 async function load() {
-  const [o, users] = await Promise.all([api('/v1/admin/overview').then((r) => r.json()), api('/v1/admin/users').then((r) => r.json())]);
+  const [o, users, pays] = await Promise.all([api('/v1/admin/overview').then((r) => r.json()), api('/v1/admin/users').then((r) => r.json()),
+    api('/v1/admin/payments').then((r) => r.json())]);
+  $('payments').innerHTML = pays.map((p) => `<tr><td>${esc(p.at)}</td><td>${p.user_id}</td><td>${esc(p.phone)}</td><td>${fmt(p.amount_kzt)} ₸</td>`
+    + `<td><button data-pay="${p.id}" data-ok="1">Подтвердить</button> <button class="secondary" data-pay="${p.id}" data-ok="0">Отклонить</button></td></tr>`).join('')
+    || '<tr><td colspan="5" class="muted">Заявок нет.</td></tr>';
   show(true);
   const r = o.roles, pct = (x) => x.cohort ? Math.round(100 * (x.kept || 0) / x.cohort) + '%' : '—';
   const kpi = [
@@ -132,6 +142,13 @@ $('csv').onclick = async (e) => {
   e.preventDefault();
   const blob = await (await api('/v1/admin/users.csv')).blob();
   const a = Object.assign(document.createElement('a'), { href: URL.createObjectURL(blob), download: 'nutrivia-users.csv' }); a.click();
+};
+
+$('payments').onclick = async (e) => {
+  const b = e.target.closest('button[data-pay]');
+  if (!b) return;
+  await api('/v1/admin/payments/' + b.dataset.pay, { method: 'POST', body: JSON.stringify({ confirm: b.dataset.ok === '1' }) });
+  load();
 };
 
 if (token) load().catch(() => {}); else show(false);

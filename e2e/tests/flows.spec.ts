@@ -102,3 +102,13 @@ test('лента: пост с приёмом пищи, без килограмм
   await b.getByLabel('Нравится').filter({ visible: true }).first().click();
   await expect(b.getByLabel('Убрать лайк').filter({ visible: true }).first()).toBeVisible();
 });
+
+test('подписка: пробный период → «Я оплатил» → оплата на проверке', async ({ page }) => {
+  await signupClient(page, '+77005550107');
+  await screen(page, 'Сегодня');
+  await page.getByText('Профиль', { exact: true }).filter({ visible: true }).click();
+  await page.getByText('Подписка', { exact: true }).filter({ visible: true }).click();
+  await expect(page.getByText(/^Пробный период: 14 дней/).filter({ visible: true }).first()).toBeVisible();
+  await page.getByText('Я оплатил', { exact: true }).filter({ visible: true }).click();
+  await expect(page.getByText('Оплата на проверке').filter({ visible: true }).first()).toBeVisible();
+});

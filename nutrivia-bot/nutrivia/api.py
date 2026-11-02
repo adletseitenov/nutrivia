@@ -379,8 +379,19 @@ def create_app(cfg: Config | None = None, vision: VisionProvider | None = None, 
         await app.state.auth.forget_user(user["tg_id"])
         await svc.delete_user(user["tg_id"])
 
+    @app.get("/v1/subscription")
+    async def subscription(svc: Svc, user: User):
+        return await svc.subscription(user["tg_id"])
+
+    @app.post("/v1/subscription/claim")
+    async def claim(svc: Svc, user: User):
+        await svc.claim_payment(user["tg_id"])
+        return await svc.subscription(user["tg_id"])
+
     @app.post("/v1/meals")
     async def upload_meal(svc: Svc, user: User, background: BackgroundTasks, photo: UploadFile = File(...)):
+        if not await svc.can_upload(user["tg_id"]):
+            raise AuthError("subscription", "Пробный период закончился. Продлите подписку в профиле.", 402)
         data = await photo.read(MAX_PHOTO_BYTES + 1)
         if len(data) > MAX_PHOTO_BYTES:
             raise HTTPException(413, "photo too large")
@@ -631,6 +642,19 @@ def create_app(cfg: Config | None = None, vision: VisionProvider | None = None, 
         if status != "ok":
             raise AuthError(status, "У номера уже есть тренер или кабинет специалиста.", 409)
         return {"phone": phone}
+
+    class DecideIn(BaseModel):
+        confirm: bool
+
+    @app.get("/v1/admin/payments", dependencies=[Admin])
+    async def admin_payments(svc: Svc):
+        return await svc.pending_payments(await phones_by_user())
+
+    @app.post("/v1/admin/payments/{payment_id}", dependencies=[Admin])
+    async def admin_decide(payment_id: int, body: DecideIn, svc: Svc):
+        if not await svc.decide_payment(payment_id, body.confirm):
+            raise HTTPException(404)
+        return {"ok": True}
 
     @app.get("/v1/admin/users.csv", dependencies=[Admin])
     async def admin_users_csv(svc: Svc):

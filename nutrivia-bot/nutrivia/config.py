@@ -28,6 +28,8 @@ class Config:
     openrouter_api_key: str = ""
     vision_fallback_model: str = ""    # запасная модель OpenRouter, если основная недоступна
     ai_daily_usd: float = 0.0          # потолок трат на ИИ в сутки; 0 — без потолка
+    trial_days: int = 14               # бесплатно с регистрации
+    paywall_enforce: bool = False      # True — без оплаты после пробного периода фото не принимаем
     db_path: str = str(ROOT / "data" / "nutrivia.db")
     photos_dir: str = str(ROOT / "data" / "photos")
     dishes_csv: str = str(ROOT / "data" / "dishes.csv")
@@ -54,6 +56,8 @@ def load_config() -> Config:
         openrouter_api_key=env.get("OPENROUTER_API_KEY", ""),
         vision_fallback_model=env.get("VISION_FALLBACK_MODEL", ""),
         ai_daily_usd=float(env.get("AI_DAILY_USD", "0") or 0),
+        trial_days=int(env.get("TRIAL_DAYS", "14") or 14),
+        paywall_enforce=env.get("PAYWALL_ENFORCE", "") in ("1", "true", "yes"),
         db_path=env.get("DB_PATH", str(ROOT / "data" / "nutrivia.db")),
         photos_dir=env.get("PHOTOS_DIR", str(ROOT / "data" / "photos")),
         dishes_csv=env.get("DISHES_CSV", str(ROOT / "data" / "dishes.csv")),

@@ -738,3 +738,33 @@ def test_feed_posts_likes_reports_moderation(client):
     assert client.delete(f"/v1/feed/{post['id']}", headers=b).status_code == 404
     assert client.delete("/v1/users/me", headers=a).status_code == 204
     assert all(p["id"] != post["id"] for p in client.get("/v1/feed", headers=b).json()["posts"])
+
+
+def test_subscription_trial_claim_confirm_and_paywall(client, monkeypatch):
+    monkeypatch.setenv("ADMIN_TOKEN", "adm")
+    A = {"X-Admin-Token": "adm"}
+    svc = client.app.state.svc
+    h, out = login(client)
+    uid = out["me"]["user_id"]
+    s = client.get("/v1/subscription", headers=h).json()
+    assert s["status"] == "trial" and s["days_left"] == 14 and not s["enforced"]
+    # пробный период прошёл
+    client.portal.call(svc.db.execute, "UPDATE users SET joined_at = joined_at - 15 * 86400 WHERE tg_id = ?", (uid,))
+    assert client.get("/v1/subscription", headers=h).json()["status"] == "expired"
+    assert upload(client, h).status_code == 200  # без PAYWALL_ENFORCE фото принимаем
+    svc.cfg.paywall_enforce = True
+    r = upload(client, h)
+    assert r.status_code == 402 and r.json()["code"] == "subscription"
+    # «Я оплатил» → админ подтверждает → 30 дней
+    assert client.post("/v1/subscription/claim", headers=h).json()["pending"] is True
+    client.post("/v1/subscription/claim", headers=h)  # повтор не плодит заявки
+    pend = client.get("/v1/admin/payments", headers=A).json()
+    assert len(pend) == 1 and pend[0]["user_id"] == uid
+    assert client.post(f"/v1/admin/payments/{pend[0]['id']}", headers=A, json={"confirm": True}).json() == {"ok": True}
+    s = client.get("/v1/subscription", headers=h).json()
+    assert s["status"] == "active" and not s["pending"]
+    assert upload(client, h).status_code == 200
+    svc.cfg.paywall_enforce = False
+    # специалисту подписка не нужна
+    h_pro, _ = login(client, phone="+77070000061", role="trainer", name="Ерлан")
+    assert client.get("/v1/subscription", headers=h_pro).json()["status"] == "free"
