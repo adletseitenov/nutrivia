@@ -421,6 +421,67 @@ def create_app(cfg: Config | None = None, vision: VisionProvider | None = None, 
     async def fridge_ideas(body: ProductsIn, svc: Svc, user: User):
         return await svc.fridge_ideas(user["tg_id"], [p.strip().lower() for p in body.products if p.strip()])
 
+    class PostIn(BaseModel):
+        kind: Literal["recipe", "habit"]
+        text: str = Field(max_length=1000)
+        meal_id: int | None = None
+
+    class ModerateIn(BaseModel):
+        keep: bool
+
+    @app.get("/v1/feed")
+    async def feed(svc: Svc, user: User, kind: Literal["recipe", "habit"] | None = None, before: int | None = None):
+        return {"posts": await svc.feed(user["tg_id"], kind, before)}
+
+    @app.post("/v1/feed")
+    async def add_post(body: PostIn, svc: Svc, user: User):
+        status, post = await svc.add_post(user["tg_id"], body.kind, body.text, body.meal_id)
+        if status.startswith("bad_text:"):
+            raise AuthError("bad_text", status.split(":", 1)[1], 422)
+        if status == "bad_meal":
+            raise HTTPException(404, "meal")
+        return post
+
+    @app.post("/v1/feed/{post_id}/like")
+    async def like(post_id: int, svc: Svc, user: User):
+        post = await svc.toggle_like(user["tg_id"], post_id)
+        if post is None:
+            raise HTTPException(404)
+        return post
+
+    @app.post("/v1/feed/{post_id}/report", status_code=204)
+    async def report(post_id: int, svc: Svc, user: User):
+        if not await svc.report_post(user["tg_id"], post_id):
+            raise HTTPException(404)
+
+    @app.delete("/v1/feed/{post_id}", status_code=204)
+    async def delete_post(post_id: int, svc: Svc, user: User):
+        if not await svc.delete_post(user["tg_id"], post_id):
+            raise HTTPException(404)
+
+    @app.get("/v1/feed/{post_id}/photo")
+    async def post_photo(post_id: int, svc: Svc, user: User):
+        """Фото приёма пищи из поста — только вошедшим и только для видимых постов."""
+        row = await svc.db.fetchone("SELECT m.photo_path FROM posts p JOIN meals m ON m.id = p.meal_id"
+                                    " WHERE p.id = ? AND p.hidden = 0", (post_id,))
+        if row is None or not row["photo_path"] or not Path(row["photo_path"]).is_file():
+            raise HTTPException(404)
+        head = Path(row["photo_path"]).read_bytes()[:12]
+        return FileResponse(row["photo_path"], media_type=sniff_image(head) or "application/octet-stream",
+                            headers={"Cache-Control": "private, max-age=86400"})
+
+    @app.get("/v1/feed/moderation")
+    async def moderation(svc: Svc, user: User):
+        posts = await svc.reported_posts(user["tg_id"])
+        if posts is None:
+            raise HTTPException(403, "operator only")
+        return {"posts": posts}
+
+    @app.post("/v1/feed/{post_id}/moderate", status_code=204)
+    async def moderate(post_id: int, body: ModerateIn, svc: Svc, user: User):
+        if not await svc.moderate(user["tg_id"], post_id, body.keep):
+            raise HTTPException(403)
+
     @app.get("/v1/meals/{meal_id}")
     async def get_meal(meal_id: int, svc: Svc, user: User):
         view = await svc.meal_view(meal_id, user["tg_id"])

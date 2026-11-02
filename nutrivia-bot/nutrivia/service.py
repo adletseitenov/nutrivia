@@ -287,6 +287,99 @@ class Service:
             "weights": [{"at": datetime.fromtimestamp(w["ts"], ALMATY).isoformat(), "kg": w["kg"]} for w in weights],
         }
 
+    # --- лента ---
+    async def _author_label(self, user_id: int) -> str:
+        streak = await self.streak_view(user_id)
+        return f"Участник · серия {streak['days']}" if streak["days"] else "Участник"
+
+    async def _post_view(self, row, viewer_id: int) -> dict:
+        likes = await self.db.fetchone("SELECT COUNT(*) AS n, SUM(user_id = ?) AS me FROM post_likes WHERE post_id = ?",
+                                       (viewer_id, row["id"]))
+        meal = None
+        if row["meal_id"]:
+            m = await self.meal_view(row["meal_id"], row["user_id"])
+            if m:
+                meal = {"items": [i["name"] for i in m["items"]], "kcal": round(sum(i["kcal"] or 0 for i in m["items"])),
+                        "protein": round(sum(i["protein"] or 0 for i in m["items"]), 1), "has_photo": m["has_photo"]}
+        return {"id": row["id"], "kind": row["kind"], "text": row["text"], "meal": meal,
+                "at": datetime.fromtimestamp(row["ts"], ALMATY).strftime("%d.%m %H:%M"),
+                "author": await self._author_label(row["user_id"]), "mine": row["user_id"] == viewer_id,
+                "likes": likes["n"], "liked": bool(likes["me"]), "hidden": bool(row["hidden"])}
+
+    async def feed(self, viewer_id: int, kind: str | None = None, before: int | None = None, limit: int = 20) -> list[dict]:
+        rows = await self.db.fetchall(
+            "SELECT * FROM posts WHERE hidden = 0 AND (? IS NULL OR kind = ?) AND (? IS NULL OR id < ?)"
+            " ORDER BY id DESC LIMIT ?", (kind, kind, before, before, limit))
+        return [await self._post_view(r, viewer_id) for r in rows]
+
+    async def add_post(self, user_id: int, kind: str, text: str, meal_id: int | None) -> tuple[str, dict | None]:
+        """Status: ok | bad_text:<причина> | bad_meal."""
+        from .feed import check_text
+        problem = check_text(text)
+        if problem:
+            return f"bad_text:{problem}", None
+        if meal_id is not None and not await self.db.fetchone(
+                "SELECT 1 FROM meals WHERE id = ? AND user_id = ?", (meal_id, user_id)):
+            return "bad_meal", None
+        pid = await self.db.execute("INSERT INTO posts (user_id, kind, text, meal_id, ts) VALUES (?, ?, ?, ?, ?)",
+                                    (user_id, kind, text.strip()[:1000], meal_id, self.db.clock()))
+        await self.db.log_event("post", user_id, kind=kind, with_meal=meal_id is not None)
+        return "ok", await self._post_view(await self.db.fetchone("SELECT * FROM posts WHERE id = ?", (pid,)), user_id)
+
+    async def toggle_like(self, user_id: int, post_id: int) -> dict | None:
+        post = await self.db.fetchone("SELECT * FROM posts WHERE id = ? AND hidden = 0", (post_id,))
+        if post is None:
+            return None
+        if await self.db.fetchone("SELECT 1 FROM post_likes WHERE post_id = ? AND user_id = ?", (post_id, user_id)):
+            await self.db.execute("DELETE FROM post_likes WHERE post_id = ? AND user_id = ?", (post_id, user_id))
+        else:
+            await self.db.execute("INSERT INTO post_likes (post_id, user_id) VALUES (?, ?)", (post_id, user_id))
+        return await self._post_view(post, user_id)
+
+    async def report_post(self, user_id: int, post_id: int) -> bool:
+        from .feed import HIDE_AFTER_REPORTS
+        if not await self.db.fetchone("SELECT 1 FROM posts WHERE id = ?", (post_id,)):
+            return False
+        await self.db.execute("INSERT OR IGNORE INTO post_reports (post_id, user_id, ts) VALUES (?, ?, ?)",
+                              (post_id, user_id, self.db.clock()))
+        n = await self.db.fetchone("SELECT COUNT(*) AS n FROM post_reports WHERE post_id = ?", (post_id,))
+        if n["n"] >= HIDE_AFTER_REPORTS:
+            await self.db.execute("UPDATE posts SET hidden = 1 WHERE id = ?", (post_id,))
+        await self.db.log_event("post_report", user_id, post_id=post_id)
+        return True
+
+    async def delete_post(self, user_id: int, post_id: int) -> bool:
+        post = await self.db.fetchone("SELECT * FROM posts WHERE id = ?", (post_id,))
+        if post is None or (post["user_id"] != user_id and not await self._is_operator(user_id)):
+            return False
+        for table in ("post_likes", "post_reports"):
+            await self.db.execute(f"DELETE FROM {table} WHERE post_id = ?", (post_id,))
+        await self.db.execute("DELETE FROM posts WHERE id = ?", (post_id,))
+        return True
+
+    async def _is_operator(self, user_id: int) -> bool:
+        u = await self.db.get_user(user_id)
+        return u is not None and u["role"] == "operator"
+
+    async def reported_posts(self, operator_id: int) -> list[dict] | None:
+        """Очередь модерации оператора: посты с жалобами, сначала скрытые."""
+        if not await self._is_operator(operator_id):
+            return None
+        rows = await self.db.fetchall(
+            "SELECT p.*, COUNT(r.user_id) AS reports FROM posts p JOIN post_reports r ON r.post_id = p.id"
+            " GROUP BY p.id ORDER BY p.hidden DESC, reports DESC, p.id DESC")
+        return [{**await self._post_view(r, operator_id), "reports": r["reports"]} for r in rows]
+
+    async def moderate(self, operator_id: int, post_id: int, keep: bool) -> bool:
+        """Оператор: оставить (жалобы снимаются, пост виден) или удалить."""
+        if not await self._is_operator(operator_id):
+            return False
+        if not keep:
+            return await self.delete_post(operator_id, post_id)
+        await self.db.execute("DELETE FROM post_reports WHERE post_id = ?", (post_id,))
+        await self.db.execute("UPDATE posts SET hidden = 0 WHERE id = ?", (post_id,))
+        return True
+
     async def delete_user(self, tg_id: int) -> None:
         for path in await self.db.delete_user(tg_id):
             Path(path).unlink(missing_ok=True)

@@ -75,3 +75,30 @@ test('холодильник: продукты → блюда под остат�
   await page.getByText('Съел', { exact: true }).filter({ visible: true }).first().click();
   await expect(page.getByText('Записано', { exact: true }).filter({ visible: true }).first()).toBeVisible();
 });
+
+test('лента: пост с приёмом пищи, без килограммов, лайк от другого участника', async ({ browser }) => {
+  const a = await browser.newPage();
+  await signupClient(a, '+77005550105');
+  await a.getByText('+ Без фото').filter({ visible: true }).click();
+  await a.getByLabel('Поиск блюда').filter({ visible: true }).fill('гречка');
+  await a.getByText('Гречка отварная').filter({ visible: true }).click();
+  await a.getByText(/^Записать · /).filter({ visible: true }).click();
+  await screen(a, 'Сегодня');
+  await a.getByText('Лента', { exact: true }).filter({ visible: true }).click();
+  await a.getByText('Поделиться', { exact: true }).filter({ visible: true }).click();
+  await a.getByLabel('Текст поста').filter({ visible: true }).fill('Минус 2 кг за неделю');
+  await a.getByText('Прикрепить последний приём пищи', { exact: false }).filter({ visible: true }).click();
+  await a.getByText('Опубликовать', { exact: true }).filter({ visible: true }).click();
+  await expect(a.getByText('без килограммов', { exact: false }).filter({ visible: true }).first()).toBeVisible();
+  await a.getByLabel('Текст поста').filter({ visible: true }).fill('Гречка с утра — и до обеда не тянет на сладкое');
+  await a.getByText('Опубликовать', { exact: true }).filter({ visible: true }).click();
+  await expect(a.getByText('Гречка отварная · ', { exact: false }).filter({ visible: true }).first()).toBeVisible();
+
+  const b = await browser.newPage();
+  await signupClient(b, '+77005550106');
+  await screen(b, 'Сегодня');
+  await b.getByText('Лента', { exact: true }).filter({ visible: true }).click();
+  await expect(b.getByText('Гречка с утра', { exact: false }).filter({ visible: true }).first()).toBeVisible();
+  await b.getByLabel('Нравится').filter({ visible: true }).first().click();
+  await expect(b.getByLabel('Убрать лайк').filter({ visible: true }).first()).toBeVisible();
+});

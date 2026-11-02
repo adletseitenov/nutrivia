@@ -698,3 +698,43 @@ def test_kazakh_dish_names(client):
     assert meal["items"][0]["name"] == "Плов с говядиной"
     assert client.patch("/v1/me", headers=h, json={"lang": "kk"}).json()["lang"] == "kk"
     assert client.get(f"/v1/meals/{meal['id']}", headers=h).json()["items"][0]["name"] == "Палау"
+
+
+def test_feed_posts_likes_reports_moderation(client):
+    a = register(client, phone="+77070000031")
+    b = register(client, phone="+77070000032")
+    meal = upload(client, a).json()
+    # килограммы не публикуем
+    r = client.post("/v1/feed", headers=a, json={"kind": "habit", "text": "Минус 3 кг за неделю!"})
+    assert r.status_code == 422 and r.json()["code"] == "bad_text"
+    post = client.post("/v1/feed", headers=a, json={"kind": "recipe", "text": "Плов с салатом на обед", "meal_id": meal["id"]}).json()
+    assert post["mine"] and post["meal"]["items"] == ["Плов с говядиной", "Салат из свежих овощей"]
+    # чужой приём пищи прикрепить нельзя
+    assert client.post("/v1/feed", headers=b, json={"kind": "recipe", "text": "Чужое", "meal_id": meal["id"]}).status_code == 404
+    client.post("/v1/feed", headers=b, json={"kind": "habit", "text": "Неделю без сладкого после ужина"})
+
+    feed_b = client.get("/v1/feed", headers=b).json()["posts"]
+    assert [p["kind"] for p in feed_b] == ["habit", "recipe"] and not feed_b[1]["mine"]
+    assert client.get("/v1/feed?kind=recipe", headers=b).json()["posts"][0]["id"] == post["id"]
+    assert client.get(f"/v1/feed/{post['id']}/photo", headers=b).status_code == 200
+    liked = client.post(f"/v1/feed/{post['id']}/like", headers=b).json()
+    assert liked["likes"] == 1 and liked["liked"]
+    assert client.post(f"/v1/feed/{post['id']}/like", headers=b).json()["likes"] == 0  # повторный — снять
+
+    # три жалобы — пост скрыт; оператор возвращает
+    for i in range(3):
+        h = b if i == 0 else register(client, phone=f"+7707000004{i}")
+        assert client.post(f"/v1/feed/{post['id']}/report", headers=h).status_code == 204
+    assert all(p["id"] != post["id"] for p in client.get("/v1/feed", headers=b).json()["posts"])
+    assert client.get(f"/v1/feed/{post['id']}/photo", headers=b).status_code == 404
+    h_op, op = login(client, phone="+77070000049")
+    client.portal.call(client.app.state.svc.db.execute, "UPDATE users SET role = 'operator' WHERE tg_id = ?", (op["me"]["user_id"],))
+    queue = client.get("/v1/feed/moderation", headers=h_op).json()["posts"]
+    assert queue[0]["id"] == post["id"] and queue[0]["hidden"] and queue[0]["reports"] == 3
+    assert client.get("/v1/feed/moderation", headers=b).status_code == 403
+    client.post(f"/v1/feed/{post['id']}/moderate", headers=h_op, json={"keep": True})
+    assert any(p["id"] == post["id"] for p in client.get("/v1/feed", headers=b).json()["posts"])
+    # удалить свой пост можно, чужой — нет; удаление аккаунта стирает посты
+    assert client.delete(f"/v1/feed/{post['id']}", headers=b).status_code == 404
+    assert client.delete("/v1/users/me", headers=a).status_code == 204
+    assert all(p["id"] != post["id"] for p in client.get("/v1/feed", headers=b).json()["posts"])

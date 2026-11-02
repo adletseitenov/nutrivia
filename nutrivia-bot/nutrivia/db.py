@@ -99,6 +99,27 @@ CREATE TABLE IF NOT EXISTS week_comments (
     ts INTEGER NOT NULL,
     PRIMARY KEY (student_id, week_start)
 );
+CREATE TABLE IF NOT EXISTS posts (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    user_id INTEGER NOT NULL,
+    kind TEXT NOT NULL,                -- recipe | habit
+    text TEXT NOT NULL,
+    meal_id INTEGER,                   -- поделился приёмом пищи: блюда и фото
+    ts INTEGER NOT NULL,
+    hidden INTEGER NOT NULL DEFAULT 0  -- скрыт модерацией или по жалобам
+);
+CREATE INDEX IF NOT EXISTS idx_posts_ts ON posts(hidden, ts);
+CREATE TABLE IF NOT EXISTS post_likes (
+    post_id INTEGER NOT NULL,
+    user_id INTEGER NOT NULL,
+    PRIMARY KEY (post_id, user_id)
+);
+CREATE TABLE IF NOT EXISTS post_reports (
+    post_id INTEGER NOT NULL,
+    user_id INTEGER NOT NULL,
+    ts INTEGER NOT NULL,
+    PRIMARY KEY (post_id, user_id)
+);
 CREATE TABLE IF NOT EXISTS pro_notes (
     student_id INTEGER NOT NULL,
     pro_id INTEGER NOT NULL,
@@ -202,6 +223,11 @@ class Database:
         await self.execute("DELETE FROM weights WHERE user_id = ?", (tg_id,))
         await self.execute("DELETE FROM week_comments WHERE student_id = ? OR pro_id = ?", (tg_id, tg_id))
         await self.execute("DELETE FROM pro_notes WHERE student_id = ? OR pro_id = ?", (tg_id, tg_id))
+        await self.execute("DELETE FROM post_likes WHERE user_id = ? OR post_id IN (SELECT id FROM posts WHERE user_id = ?)",
+                           (tg_id, tg_id))
+        await self.execute("DELETE FROM post_reports WHERE user_id = ? OR post_id IN (SELECT id FROM posts WHERE user_id = ?)",
+                           (tg_id, tg_id))
+        await self.execute("DELETE FROM posts WHERE user_id = ?", (tg_id,))
         await self.execute("DELETE FROM users WHERE tg_id = ?", (tg_id,))
         # специалист: ученики остаются, но отвязываются; код приглашения перестаёт работать
         pro = await self.fetchone("SELECT code FROM pros WHERE user_id = ?", (tg_id,))

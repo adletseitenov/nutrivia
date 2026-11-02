@@ -33,13 +33,15 @@ function useWebAuthed(source: Source | null) {
   return needs ? (blobUri ? { uri: blobUri } : null) : source;
 }
 
-/** Фото приёма пищи: снимок на телефоне, своё с сервера (server:<id>), ученика (pro:<id>), демо-плов или заглушка. */
+/** Фото приёма пищи: снимок на телефоне, своё с сервера (server:<id>), ученика (pro:<id>), из ленты (post:<id>), демо-плов или заглушка. */
 export function MealPhoto({ uri, width, height, radius = 0 }: { uri?: string | null; width: number; height: number; radius?: number }) {
   const c = useColors();
   const source: Source | null = uri?.startsWith('server:')
     ? photoSource(Number(uri.slice(7)))
     : uri?.startsWith('pro:')
       ? photoSource(Number(uri.slice(4)), 'pro')
+      : uri?.startsWith('post:')
+        ? photoSource(Number(uri.slice(5)), 'post')
       : uri && uri !== 'demo:plov'
         ? { uri }
         : null;

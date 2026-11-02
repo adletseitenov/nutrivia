@@ -2,7 +2,9 @@ import { router, useFocusEffect } from 'expo-router';
 import { useCallback, useState } from 'react';
 import { ActivityIndicator, Pressable, Share, StyleSheet, View } from 'react-native';
 
-import { ApiError, getQueue, getStudents, logout, type Me, type ProMeal, type Student } from '@/api/client';
+import {
+  ApiError, getModeration, getQueue, getStudents, logout, moderatePost, type Me, type Post, type ProMeal, type Student,
+} from '@/api/client';
 import { Button } from '@/components/button';
 import { MealCard } from '@/components/meal-card';
 import { Screen } from '@/components/screen';
@@ -32,6 +34,7 @@ export default function Pro() {
   const { dispatch } = useAppStore();
   const [data, setData] = useState<{ students: Student[]; me: Me } | null>(null);
   const [queue, setQueue] = useState<ProMeal[]>([]);
+  const [reported, setReported] = useState<Post[]>([]);
   const [error, setError] = useState<string | null>(null);
 
   // При каждом возвращении в кабинет — свежие ученики и очередь; пока открыт — раз в 20 секунд
@@ -43,6 +46,8 @@ export default function Pro() {
           (e) => setError(e instanceof ApiError ? e.message : 'Не получилось загрузить учеников.'),
         );
         getQueue().then((r) => setQueue(r.meals), () => {});
+        // Модерация ленты — только у оператора; специалисту сервер ответит 403, это нормально
+        getModeration().then((r) => setReported(r.posts), () => setReported([]));
       };
       load();
       const timer = setInterval(load, 20000);
@@ -122,6 +127,27 @@ export default function Pro() {
               })
             )}
           </View>
+
+          {isOperator && reported.length > 0 && (
+            <View style={{ gap: space[3] }}>
+              <Txt variant="title" style={{ fontSize: 20, lineHeight: 26 }}>Жалобы в ленте</Txt>
+              {reported.map((p) => (
+                <View key={p.id} style={[styles.student, { backgroundColor: c.surface }]}>
+                  <View style={styles.row}>
+                    <Txt variant="caption" tone="muted">{p.author} · {p.at}</Txt>
+                    <Txt variant="caption" tone="warning">{p.hidden ? 'скрыт · ' : ''}жалоб: {p.reports}</Txt>
+                  </View>
+                  <Txt style={{ fontSize: 15, lineHeight: 22 }}>{p.text}</Txt>
+                  <View style={styles.row}>
+                    <Button title="Оставить" variant="secondary" size="s"
+                      onPress={() => moderatePost(p.id, true).then(() => setReported((r) => r.filter((x) => x.id !== p.id)), () => {})} />
+                    <Button title="Удалить" variant="secondary" size="s"
+                      onPress={() => moderatePost(p.id, false).then(() => setReported((r) => r.filter((x) => x.id !== p.id)), () => {})} />
+                  </View>
+                </View>
+              ))}
+            </View>
+          )}
 
           <View style={{ gap: space[3] }}>
             <Txt variant="title" style={{ fontSize: 20, lineHeight: 26 }}>{isOperator ? 'Клиенты без тренера' : 'Ученики сегодня'}</Txt>

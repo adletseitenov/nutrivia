@@ -154,8 +154,8 @@ async function clearSession() {
 }
 
 /** Фото приёма пищи с сервера по токену сессии: своё (meal) или ученика (pro). */
-export function photoSource(mealId: number, kind: 'meal' | 'pro' = 'meal') {
-  const path = kind === 'pro' ? `/v1/pro/meals/${mealId}/photo` : `/v1/meals/${mealId}/photo`;
+export function photoSource(id: number, kind: 'meal' | 'pro' | 'post' = 'meal') {
+  const path = kind === 'pro' ? `/v1/pro/meals/${id}/photo` : kind === 'post' ? `/v1/feed/${id}/photo` : `/v1/meals/${id}/photo`;
   return { uri: `${BASE}${path}`, headers: token ? { Authorization: `Bearer ${token}` } : undefined };
 }
 
@@ -381,6 +381,30 @@ export async function exportMe(): Promise<string> {
   if (!res.ok) throw new ApiError(res.status, 'Не получилось выгрузить данные. Попробуйте ещё раз.');
   return res.text();
 }
+
+export type Post = {
+  id: number;
+  kind: 'recipe' | 'habit';
+  text: string;
+  meal: { items: string[]; kcal: number; protein: number; has_photo: boolean } | null;
+  at: string;
+  author: string;
+  mine: boolean;
+  likes: number;
+  liked: boolean;
+  hidden: boolean;
+  reports?: number;
+};
+
+export const getFeed = (kind?: Post['kind']) => request<{ posts: Post[] }>(kind ? `/v1/feed?kind=${kind}` : '/v1/feed');
+export const addPost = (kind: Post['kind'], text: string, mealId?: number) =>
+  request<Post>('/v1/feed', { method: 'POST', ...json({ kind, text, meal_id: mealId ?? null }) });
+export const likePost = (id: number) => request<Post>(`/v1/feed/${id}/like`, { method: 'POST' });
+export const reportPost = (id: number) => request<void>(`/v1/feed/${id}/report`, { method: 'POST' });
+export const deletePost = (id: number) => request<void>(`/v1/feed/${id}`, { method: 'DELETE' });
+export const getModeration = () => request<{ posts: Post[] }>('/v1/feed/moderation');
+export const moderatePost = (id: number, keep: boolean) =>
+  request<void>(`/v1/feed/${id}/moderate`, { method: 'POST', ...json({ keep }) });
 
 export async function deleteMe() {
   await request<void>('/v1/users/me', { method: 'DELETE' });
