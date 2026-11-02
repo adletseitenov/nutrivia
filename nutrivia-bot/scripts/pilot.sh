@@ -46,7 +46,7 @@ cat <<MSG
 Пилот запущен.
   Приложение: $URL   (открыть в Safari / Chrome на телефоне)
   Логи:       $LOGS
-  Коды входа: .venv/bin/python -m scripts.pilot_code +7707…
+  Админка:    $URL/admin  (токен — ADMIN_TOKEN в .env): коды входа, операторы, метрики
 
 Мак не выключать и не усыплять. Остановить — Ctrl+C.
 MSG

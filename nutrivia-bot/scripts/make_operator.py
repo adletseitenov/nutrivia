@@ -10,7 +10,7 @@ import asyncio
 import os
 import sys
 
-from nutrivia.auth import ManualCodes, SmsAuth, normalize_phone
+from nutrivia.auth import ManualCodes, SmsAuth
 from nutrivia.config import load_config
 from nutrivia.db import Database
 from nutrivia.engine import DishBase
@@ -25,17 +25,10 @@ async def main(raw: str) -> None:
     auth = SmsAuth(db, ManualCodes(), os.environ.get("AUTH_SECRET", ""))
     await auth.init()
     try:
-        phone = normalize_phone(raw)
-        uid = await auth.user_for_phone(phone)
-        if uid is None:
-            svc = Service(db, DishBase.from_csv(cfg.dishes_csv), FakeVision(), cfg)
-            uid = (await svc.create_app_user("client", "ru", None, None))["tg_id"]
-            await auth.link(phone, uid)
-        user = await db.get_user(uid)
-        if user["coach_code"] or await db.fetchone("SELECT 1 FROM pros WHERE user_id = ?", (uid,)):
+        svc = Service(db, DishBase.from_csv(cfg.dishes_csv), FakeVision(), cfg)
+        phone, status = await svc.make_operator(auth, raw)
+        if status != "ok":
             sys.exit(f"{phone}: у номера уже есть тренер или кабинет специалиста — оператором не делаю")
-        await db.update_user(uid, role="operator")
-        await db.log_event("operator_set", uid)
         print(f"{phone}: оператор. Войти в приложение по коду: .venv/bin/python -m scripts.pilot_code {phone}")
     finally:
         await db.close()

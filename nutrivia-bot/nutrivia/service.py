@@ -728,6 +728,75 @@ class Service:
                               (student_id, pro_user_id, text.strip()[:4000], self.db.clock()))
         return True
 
+    async def make_operator(self, auth, raw_phone: str) -> tuple[str, str]:
+        """Номер → оператор Nutrivia. Нет аккаунта — создаём. Возвращает (номер, статус): ok | has_coach."""
+        from .auth import normalize_phone
+        phone = normalize_phone(raw_phone)
+        uid = await auth.user_for_phone(phone)
+        if uid is None:
+            uid = (await self.create_app_user("client", "ru", None, None))["tg_id"]
+            await auth.link(phone, uid)
+        user = await self.db.get_user(uid)
+        if user["coach_code"] or await self.pro_code(uid):
+            return phone, "has_coach"
+        await self.db.update_user(uid, role="operator")
+        await self.db.log_event("operator_set", uid)
+        return phone, "ok"
+
+    async def admin_overview(self) -> dict:
+        """Пилот одним взглядом: кто есть, сколько фото по дням, удержание, очередь, расходы на ИИ."""
+        from datetime import timedelta
+        from .metrics import compute_metrics
+        now_ts = self.db.clock()
+        roles = {r["role"]: r["n"] for r in await self.db.fetchall(
+            "SELECT role, COUNT(*) AS n FROM users WHERE channel = 'app' GROUP BY role")}
+        days = []
+        for back in range(13, -1, -1):
+            start, end = local_day_bounds(now_ts, back)
+            row = await self.db.fetchone(
+                "SELECT COUNT(*) AS photos, COUNT(DISTINCT user_id) AS users FROM meals"
+                " WHERE received_at >= ? AND received_at < ? AND photo_path IS NOT NULL", (start, end))
+            days.append({"date": datetime.fromtimestamp(start, ALMATY).date().isoformat(), **dict(row)})
+        # удержание: из пришедших не позже чем N дней назад — кто прислал что-то на N-й день и позже
+        def retained(n: int):
+            return self.db.fetchone(
+                "SELECT COUNT(*) AS cohort, SUM(EXISTS(SELECT 1 FROM meals m WHERE m.user_id = u.tg_id"
+                " AND m.received_at >= u.joined_at + ? * 86400)) AS kept FROM users u"
+                " WHERE u.channel = 'app' AND u.role = 'client' AND u.joined_at <= ?", (n, now_ts - n * 86400))
+        d1, d7 = await retained(1), await retained(7)
+        pending = await self.db.fetchone(
+            "SELECT COUNT(*) AS n, MIN(received_at) AS oldest FROM meals WHERE status = 'draft'")
+        metrics = await compute_metrics(self.db)
+        m = metrics["summary"]
+        return {
+            "roles": roles, "photos_by_day": days,
+            "retention": {"d1": dict(d1), "d7": dict(d7)},
+            "queue": {"pending": pending["n"],
+                      "oldest_wait_min": round((now_ts - pending["oldest"]) / 60) if pending["oldest"] else None},
+            "review_median_s": m["median_review_seconds"], "gram_error_median": m["gram_error_median"],
+            "ai": {"requests": m["ai_requests"], "failed": m["ai_failed"], "cost_usd": m["ai_cost_usd"]},
+            "missing_dishes": metrics["missing_dishes"][:15],
+        }
+
+    async def admin_users(self, phones: dict[int, str]) -> list[dict]:
+        """Все пользователи приложения: роль, тренер, активность за неделю. Номер — с маской."""
+        week = self.db.clock() - 7 * 86400
+        out = []
+        for u in await self.db.fetchall("SELECT * FROM users WHERE channel = 'app' ORDER BY joined_at DESC"):
+            coach = await self.db.get_coach(u["coach_code"])
+            act = await self.db.fetchone(
+                "SELECT COUNT(*) AS meals7, MAX(received_at) AS last, SUM(status = 'draft') AS pending"
+                " FROM meals WHERE user_id = ? AND received_at >= ?", (u["tg_id"], week))
+            phone = phones.get(u["tg_id"], "")
+            out.append({
+                "user_id": u["tg_id"], "role": u["role"], "phone": phone[:4] + " *** ** " + phone[-4:-2] + " " + phone[-2:] if phone else "",
+                "coach": coach["name"] if coach else None, "pro_code": await self.pro_code(u["tg_id"]),
+                "joined": datetime.fromtimestamp(u["joined_at"], ALMATY).date().isoformat(),
+                "meals_7d": act["meals7"], "pending": act["pending"] or 0,
+                "last": datetime.fromtimestamp(act["last"], ALMATY).strftime("%d.%m %H:%M") if act["last"] else None,
+            })
+        return out
+
     async def is_reviewer(self, user_id: int) -> bool:
         return await self._scope(user_id) is not None
 

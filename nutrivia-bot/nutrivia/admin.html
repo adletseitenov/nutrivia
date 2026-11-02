@@ -1,0 +1,140 @@
+<!doctype html>
+<html lang="ru">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Nutrivia · админка</title>
+<style>
+  :root { --bg:#fff; --surface:#F5F4F9; --line:#E8E6F0; --ink:#0E0C16; --muted:#6E6A7C; --accent:#6B4EFF; --accent-text:#5135E0; --tint:#F0ECFF; --blue:#2E6BFF; --warn:#B45309; }
+  @media (prefers-color-scheme: dark) { :root { --bg:#0C0B12; --surface:#17151F; --line:#2C2838; --ink:#F5F3FB; --muted:#A19DB0; --accent:#8F7BFF; --accent-text:#ADA0FF; --tint:#221B45; --blue:#6F9BFF; --warn:#F5A524; } }
+  * { box-sizing: border-box; } [hidden] { display: none !important; }
+  body { margin:0; background:var(--bg); color:var(--ink); font:15px/1.45 -apple-system, "Segoe UI", Roboto, sans-serif; }
+  main { max-width:1100px; margin:0 auto; padding:24px 16px 64px; display:grid; gap:20px; }
+  h1 { font-size:26px; margin:0; letter-spacing:-.4px; } h2 { font-size:17px; margin:0 0 12px; }
+  .muted { color:var(--muted); } .warn { color:var(--warn); }
+  .grid { display:grid; grid-template-columns:repeat(auto-fit, minmax(170px, 1fr)); gap:12px; }
+  .card { background:var(--surface); border-radius:18px; padding:16px; }
+  .num { font-size:26px; font-weight:800; letter-spacing:-.5px; }
+  .bars { display:flex; align-items:flex-end; gap:6px; height:110px; }
+  .bars div { flex:1; background:var(--accent); border-radius:6px 6px 2px 2px; min-height:2px; position:relative; }
+  .bars span { position:absolute; bottom:-20px; left:50%; transform:translateX(-50%); font-size:11px; color:var(--muted); }
+  table { width:100%; border-collapse:collapse; font-size:14px; } th, td { text-align:left; padding:8px 6px; border-bottom:1px solid var(--line); }
+  th { color:var(--muted); font-weight:600; font-size:12px; }
+  .pill { display:inline-block; padding:2px 8px; border-radius:99px; background:var(--tint); color:var(--accent-text); font-size:12px; font-weight:600; }
+  form { display:flex; gap:8px; flex-wrap:wrap; } input { flex:1; min-width:180px; padding:11px 12px; border-radius:12px; border:1.5px solid var(--line); background:var(--bg); color:var(--ink); font:inherit; }
+  button { padding:11px 16px; border:0; border-radius:99px; background:var(--accent); color:#fff; font:inherit; font-weight:600; cursor:pointer; }
+  button.secondary { background:var(--surface); color:var(--ink); border:1.5px solid var(--line); }
+  pre { white-space:pre-wrap; background:var(--bg); border:1px solid var(--line); border-radius:12px; padding:12px; margin:12px 0 0; }
+  .row { display:flex; justify-content:space-between; align-items:center; gap:12px; flex-wrap:wrap; }
+  .scroll { overflow-x:auto; }
+  #login { max-width:420px; margin:15vh auto; }
+</style>
+</head>
+<body>
+<main id="login" hidden>
+  <h1>Nutrivia · админка</h1>
+  <p class="muted">Токен — значение ADMIN_TOKEN из nutrivia-bot/.env.</p>
+  <form id="tokenForm"><input id="token" type="password" placeholder="ADMIN_TOKEN" autocomplete="off" aria-label="Токен"><button>Войти</button></form>
+  <p id="loginErr" class="warn"></p>
+</main>
+
+<main id="app" hidden>
+  <div class="row"><h1>Nutrivia · пилот</h1><div><button class="secondary" id="refresh">Обновить</button> <button class="secondary" id="logout">Выйти</button></div></div>
+
+  <section class="grid" id="kpis"></section>
+
+  <section class="card">
+    <h2>Фото по дням (14 дней)</h2>
+    <div class="bars" id="bars"></div><div style="height:22px"></div>
+  </section>
+
+  <section class="grid">
+    <div class="card">
+      <h2>Код входа участнику</h2>
+      <form id="codeForm"><input id="codePhone" placeholder="+7 707 123 45 67" aria-label="Номер для кода"><button>Выдать код</button></form>
+      <pre id="codeOut" hidden></pre>
+      <button class="secondary" id="copy" hidden>Скопировать сообщение</button>
+    </div>
+    <div class="card">
+      <h2>Оператор Nutrivia</h2>
+      <p class="muted">Проверяет разборы клиентов без тренера и разборы, ждущие дольше 15 минут.</p>
+      <form id="opForm"><input id="opPhone" placeholder="+7 707 123 45 67" aria-label="Номер оператора"><button>Сделать оператором</button></form>
+      <p id="opOut"></p>
+    </div>
+  </section>
+
+  <section class="card">
+    <div class="row"><h2>Пользователи</h2><a href="#" id="csv" class="pill">Скачать CSV</a></div>
+    <div class="scroll"><table><thead><tr><th>id</th><th>роль</th><th>номер</th><th>тренер / код</th><th>с</th><th>фото за 7 дн.</th><th>ждут</th><th>последнее</th></tr></thead><tbody id="users"></tbody></table></div>
+  </section>
+
+  <section class="card"><h2>Блюда, которых нет в базе</h2><div id="missing" class="muted"></div></section>
+</main>
+
+<script>
+const KEY = 'nutrivia.admin';
+let token = (() => { try { return localStorage.getItem(KEY) || ''; } catch { return ''; } })();
+const $ = (id) => document.getElementById(id);
+const esc = (s) => String(s ?? '').replace(/[&<>"]/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]));
+const ROLES = { client: 'клиент', trainer: 'тренер', nutritionist: 'нутрициолог', operator: 'оператор' };
+
+async function api(path, init = {}) {
+  const r = await fetch(path, { ...init, headers: { 'X-Admin-Token': token, 'Content-Type': 'application/json', ...(init.headers || {}) } });
+  if (r.status === 401) { show(false, 'Неверный токен.'); throw new Error('401'); }
+  if (!r.ok) { const b = await r.json().catch(() => ({})); throw new Error(b.message || b.detail || r.statusText); }
+  return r;
+}
+
+function show(app, err = '') {
+  $('app').hidden = !app; $('login').hidden = app; $('loginErr').textContent = err;
+}
+
+const fmt = (n) => n == null ? '—' : Number(n).toLocaleString('ru-RU');
+
+async function load() {
+  const [o, users] = await Promise.all([api('/v1/admin/overview').then((r) => r.json()), api('/v1/admin/users').then((r) => r.json())]);
+  show(true);
+  const r = o.roles, pct = (x) => x.cohort ? Math.round(100 * (x.kept || 0) / x.cohort) + '%' : '—';
+  const kpi = [
+    ['клиентов', fmt(r.client || 0)], ['специалистов', fmt((r.trainer || 0) + (r.nutritionist || 0))], ['операторов', fmt(r.operator || 0)],
+    ['ждут проверки', fmt(o.queue.pending) + (o.queue.oldest_wait_min ? ` · до ${o.queue.oldest_wait_min} мин` : '')],
+    ['проверка, медиана', o.review_median_s ? Math.round(o.review_median_s / 60) + ' мин' : '—'],
+    ['вернулись на 1-й день', pct(o.retention.d1)], ['на 7-й день', pct(o.retention.d7)],
+    ['ошибка граммов ИИ', o.gram_error_median == null ? '—' : Math.round(o.gram_error_median * 100) + '%'],
+    ['запросов к ИИ', fmt(o.ai.requests) + (o.ai.failed ? ` · ошибок ${o.ai.failed}` : '')], ['расходы на ИИ', '$' + (o.ai.cost_usd || 0).toFixed(2)],
+  ];
+  $('kpis').innerHTML = kpi.map(([l, v]) => `<div class="card"><div class="num">${esc(v)}</div><div class="muted">${esc(l)}</div></div>`).join('');
+  const max = Math.max(1, ...o.photos_by_day.map((d) => d.photos));
+  $('bars').innerHTML = o.photos_by_day.map((d) => `<div title="${esc(d.date)}: ${d.photos} фото, ${d.users} чел." style="height:${Math.max(2, 100 * d.photos / max)}%"><span>${Number(d.date.slice(8))}</span></div>`).join('');
+  $('users').innerHTML = users.map((u) => `<tr><td>${u.user_id}</td><td><span class="pill">${esc(ROLES[u.role] || u.role)}</span></td><td>${esc(u.phone)}</td>`
+    + `<td>${esc(u.coach || u.pro_code || '—')}</td><td>${esc(u.joined)}</td><td>${u.meals_7d}</td><td${u.pending ? ' class="warn"' : ''}>${u.pending}</td><td>${esc(u.last || '—')}</td></tr>`).join('')
+    || '<tr><td colspan="8" class="muted">Пока никого.</td></tr>';
+  $('missing').textContent = o.missing_dishes.length ? o.missing_dishes.map(([n, c]) => `${n} (${c})`).join(', ') : 'Всё распознанное есть в базе.';
+}
+
+$('tokenForm').onsubmit = (e) => { e.preventDefault(); token = $('token').value.trim(); try { localStorage.setItem(KEY, token); } catch {} load().catch(() => {}); };
+$('logout').onclick = () => { token = ''; try { localStorage.removeItem(KEY); } catch {} show(false); };
+$('refresh').onclick = () => load().catch((e) => alert(e.message));
+$('codeForm').onsubmit = async (e) => {
+  e.preventDefault();
+  try {
+    const r = await (await api('/v1/admin/codes', { method: 'POST', body: JSON.stringify({ phone: $('codePhone').value }) })).json();
+    $('codeOut').textContent = r.message; $('codeOut').hidden = false; $('copy').hidden = false;
+  } catch (err) { $('codeOut').textContent = 'Не получилось: ' + err.message; $('codeOut').hidden = false; }
+};
+$('copy').onclick = () => navigator.clipboard?.writeText($('codeOut').textContent).then(() => { $('copy').textContent = 'Скопировано'; setTimeout(() => { $('copy').textContent = 'Скопировать сообщение'; }, 1500); });
+$('opForm').onsubmit = async (e) => {
+  e.preventDefault();
+  try { const r = await (await api('/v1/admin/operators', { method: 'POST', body: JSON.stringify({ phone: $('opPhone').value }) })).json(); $('opOut').textContent = `${r.phone} — оператор. Выдайте ему код входа слева.`; load(); }
+  catch (err) { $('opOut').textContent = 'Не получилось: ' + err.message; }
+};
+$('csv').onclick = async (e) => {
+  e.preventDefault();
+  const blob = await (await api('/v1/admin/users.csv')).blob();
+  const a = Object.assign(document.createElement('a'), { href: URL.createObjectURL(blob), download: 'nutrivia-users.csv' }); a.click();
+};
+
+if (token) load().catch(() => {}); else show(false);
+</script>
+</body>
+</html>

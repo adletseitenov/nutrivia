@@ -460,6 +460,68 @@ def create_app(cfg: Config | None = None, vision: VisionProvider | None = None, 
             hits = [svc.base.get(k) for _, _, k in found]
         return [dish_hit(d) for d in hits]
 
+    # --- админка (ADMIN_TOKEN в .env; без него выключена) ---
+    async def admin_dep(x_admin_token: Annotated[str | None, Header()] = None):
+        expected = os.environ.get("ADMIN_TOKEN", "")
+        if not expected:
+            raise HTTPException(404)
+        if not x_admin_token or not secrets.compare_digest(x_admin_token, expected):
+            raise HTTPException(401, "admin token")
+
+    Admin = Depends(admin_dep)
+
+    class PhoneIn(BaseModel):
+        phone: str = Field(max_length=32)
+
+    async def phones_by_user() -> dict[int, str]:
+        rows = await app.state.svc.db.fetchall("SELECT phone, user_id FROM app_accounts")
+        return {r["user_id"]: r["phone"] for r in rows}
+
+    @app.get("/admin", include_in_schema=False)
+    async def admin_page():
+        if not os.environ.get("ADMIN_TOKEN"):
+            raise HTTPException(404)
+        return FileResponse(Path(__file__).with_name("admin.html"), headers={"Cache-Control": "no-cache"})
+
+    @app.get("/v1/admin/overview", dependencies=[Admin])
+    async def admin_overview(svc: Svc):
+        return await svc.admin_overview()
+
+    @app.get("/v1/admin/users", dependencies=[Admin])
+    async def admin_users(svc: Svc):
+        return await svc.admin_users(await phones_by_user())
+
+    @app.post("/v1/admin/codes", dependencies=[Admin])
+    async def admin_code(body: PhoneIn, request: Request):
+        """Код входа для пилота без SMS — как scripts/pilot_code, но кнопкой. Ссылка — адрес, с которого открыта админка."""
+        phone, code = await app.state.auth.issue_manual(body.phone)
+        link = os.environ.get("PUBLIC_URL") or str(request.base_url).rstrip("/")
+        text = (f"Привет! Это Nutrivia — фото еды → калории и разбор от нутрициолога.\n"
+                f"1. Открой ссылку в Safari или Chrome на телефоне: {link}\n"
+                f"2. Чтобы было как приложение: «Поделиться» → «На экран Домой».\n"
+                f"3. Введи свой номер и код входа: {code}\nКод одноразовый, действует 7 дней.")
+        return {"phone": phone, "code": code, "message": text}
+
+    @app.post("/v1/admin/operators", dependencies=[Admin])
+    async def admin_operator(body: PhoneIn, svc: Svc):
+        phone, status = await svc.make_operator(app.state.auth, body.phone)
+        if status != "ok":
+            raise AuthError(status, "У номера уже есть тренер или кабинет специалиста.", 409)
+        return {"phone": phone}
+
+    @app.get("/v1/admin/users.csv", dependencies=[Admin])
+    async def admin_users_csv(svc: Svc):
+        import csv
+        import io
+        from fastapi.responses import Response
+        rows = await svc.admin_users(await phones_by_user())
+        buf = io.StringIO()
+        w = csv.DictWriter(buf, fieldnames=list(rows[0]) if rows else ["user_id"])
+        w.writeheader()
+        w.writerows(rows)
+        return Response(buf.getvalue(), media_type="text/csv; charset=utf-8",
+                        headers={"Content-Disposition": "attachment; filename=nutrivia-users.csv"})
+
     # Веб-версия приложения (WEB_DIR = результат `expo export -p web`): тот же адрес, что и API
     web_dir = os.environ.get("WEB_DIR")
     if web_dir and Path(web_dir, "index.html").is_file():

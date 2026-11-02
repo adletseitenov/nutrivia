@@ -604,3 +604,22 @@ def test_student_card_week_comment_target_note(client):
     assert client.put(f"/v1/pro/students/{sid}/note", headers=h_other, json={"text": "x"}).status_code == 404
     # клиент в кабинет не попадает
     assert client.get(f"/v1/pro/students/{sid}", headers=h_st).status_code == 403
+
+
+def test_admin_requires_token_and_works(client, monkeypatch):
+    assert client.get("/v1/admin/overview").status_code == 404  # без ADMIN_TOKEN админки нет
+    monkeypatch.setenv("ADMIN_TOKEN", "adm")
+    assert client.get("/v1/admin/overview", headers={"X-Admin-Token": "wrong"}).status_code == 401
+    A = {"X-Admin-Token": "adm"}
+    h = register(client)
+    upload(client, h)
+    o = client.get("/v1/admin/overview", headers=A).json()
+    assert o["roles"]["client"] == 1 and o["queue"]["pending"] == 1 and o["photos_by_day"][-1]["photos"] == 1
+    users = client.get("/v1/admin/users", headers=A).json()
+    assert users[0]["phone"].startswith("+770 ***") and users[0]["pending"] == 1
+    r = client.post("/v1/admin/codes", headers=A, json={"phone": "+77071112299"}).json()
+    assert len(r["code"]) == 4 and r["code"] in r["message"]
+    assert client.post("/v1/admin/operators", headers=A, json={"phone": "+77071112299"}).status_code == 200
+    assert "operator" in client.get("/v1/admin/overview", headers=A).json()["roles"]
+    assert client.get("/v1/admin/users.csv", headers=A).text.startswith("user_id,role,phone")
+    assert client.get("/admin").status_code == 200
