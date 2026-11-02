@@ -1,6 +1,6 @@
 import { router, useFocusEffect } from 'expo-router';
 import { useCallback, useState } from 'react';
-import { ActivityIndicator, Share, StyleSheet, View } from 'react-native';
+import { ActivityIndicator, Pressable, Share, StyleSheet, View } from 'react-native';
 
 import { ApiError, getQueue, getStudents, logout, type Me, type ProMeal, type Student } from '@/api/client';
 import { Button } from '@/components/button';
@@ -18,6 +18,14 @@ import { useColors } from '@/theme/use-colors';
  * Кабинет тренера, нутрициолога или оператора Nutrivia: очередь разборов на проверку и клиенты за сегодня.
  * У тренера и нутрициолога ещё код приглашения для учеников.
  */
+/** «ждёт 12 мин» — специалист видит, сколько клиент уже ждёт (обещание — 15 минут) */
+function waitLabel(ts?: number) {
+  const min = Math.max(0, Math.round((Date.now() / 1000 - (ts ?? 0)) / 60));
+  if (min < 1) return 'только что';
+  if (min < 60) return `ждёт ${min} мин`;
+  return `ждёт ${Math.floor(min / 60)} ч`;
+}
+
 export default function Pro() {
   const c = useColors();
   const { dispatch } = useAppStore();
@@ -96,12 +104,11 @@ export default function Pro() {
               queue.map((m) => {
                 const items = itemsFromServer(m.items);
                 const n = mealNutrients(items);
-                const d = new Date((m.received_at ?? 0) * 1000);
                 return (
                   <MealCard
                     key={m.id}
                     title={`${m.student}: ${items.map((i) => i.name).join(', ').toLowerCase()}`}
-                    time={`${String(d.getHours()).padStart(2, '0')}:${String(d.getMinutes()).padStart(2, '0')}`}
+                    time={waitLabel(m.received_at)}
                     kcal={n.kcal}
                     protein={n.protein}
                     carbs={n.carbs}
@@ -126,7 +133,11 @@ export default function Pro() {
               </View>
             )}
             {data.students.map((s) => (
-              <View key={s.user_id} style={[styles.student, { backgroundColor: c.surface }]}>
+              <Pressable
+                key={s.user_id}
+                accessibilityRole="button"
+                onPress={() => router.push({ pathname: '/student', params: { id: String(s.user_id) } })}
+                style={({ pressed }) => [styles.student, { backgroundColor: c.surface, opacity: pressed ? 0.85 : 1 }]}>
                 <View style={styles.row}>
                   <Txt variant="headline">{s.label}</Txt>
                   <Txt variant="caption" tone="muted">
@@ -142,7 +153,7 @@ export default function Pro() {
                   </Txt>
                   {s.pending_reviews > 0 && <StatusPill status="draft" label={`Ждут проверки: ${s.pending_reviews}`} />}
                 </View>
-              </View>
+              </Pressable>
             ))}
           </View>
         </>

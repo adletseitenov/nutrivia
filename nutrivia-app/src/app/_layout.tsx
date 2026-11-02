@@ -63,6 +63,7 @@ export default function RootLayout() {
           <Stack.Screen name="pro" options={{ gestureEnabled: false }} />
           <Stack.Screen name="join" options={{ presentation: 'modal' }} />
           <Stack.Screen name="pro-review" />
+          <Stack.Screen name="student" />
           <Stack.Screen name="(tabs)" />
           <Stack.Screen name="camera" options={{ presentation: 'fullScreenModal', animation: 'slide_from_bottom' }} />
           <Stack.Screen name="review" />

@@ -91,6 +91,21 @@ CREATE TABLE IF NOT EXISTS weights (
     kg REAL NOT NULL
 );
 CREATE INDEX IF NOT EXISTS idx_weights_user ON weights(user_id, ts);
+CREATE TABLE IF NOT EXISTS week_comments (
+    student_id INTEGER NOT NULL,
+    week_start TEXT NOT NULL,          -- дата понедельника недели по Алматы
+    pro_id INTEGER NOT NULL,
+    text TEXT NOT NULL,
+    ts INTEGER NOT NULL,
+    PRIMARY KEY (student_id, week_start)
+);
+CREATE TABLE IF NOT EXISTS pro_notes (
+    student_id INTEGER NOT NULL,
+    pro_id INTEGER NOT NULL,
+    text TEXT NOT NULL,
+    ts INTEGER NOT NULL,
+    PRIMARY KEY (student_id, pro_id)
+);
 CREATE INDEX IF NOT EXISTS idx_meals_user ON meals(user_id, received_at);
 CREATE INDEX IF NOT EXISTS idx_events_name ON events(name, ts);
 """
@@ -179,6 +194,8 @@ class Database:
             await self.execute(f"DELETE FROM meal_items WHERE meal_id IN ({marks})", tuple(ids))
         await self.execute("DELETE FROM meals WHERE user_id = ?", (tg_id,))
         await self.execute("DELETE FROM weights WHERE user_id = ?", (tg_id,))
+        await self.execute("DELETE FROM week_comments WHERE student_id = ? OR pro_id = ?", (tg_id, tg_id))
+        await self.execute("DELETE FROM pro_notes WHERE student_id = ? OR pro_id = ?", (tg_id, tg_id))
         await self.execute("DELETE FROM users WHERE tg_id = ?", (tg_id,))
         # специалист: ученики остаются, но отвязываются; код приглашения перестаёт работать
         pro = await self.fetchone("SELECT code FROM pros WHERE user_id = ?", (tg_id,))

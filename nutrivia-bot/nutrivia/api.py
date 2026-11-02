@@ -264,6 +264,37 @@ def create_app(cfg: Config | None = None, vision: VisionProvider | None = None, 
 
     Pro = Annotated[dict, Depends(pro_dep)]
 
+    class TextIn(BaseModel):
+        text: str = Field(max_length=4000)
+
+    class TargetIn(BaseModel):
+        kcal: int | None = Field(default=None, ge=1000, le=5000)
+
+    @app.get("/v1/pro/students/{student_id}")
+    async def student_card(student_id: int, svc: Svc, pro: Pro):
+        card = await svc.student_card(pro["tg_id"], student_id)
+        if card is None:
+            raise HTTPException(404)
+        return card
+
+    @app.post("/v1/pro/students/{student_id}/week-comment")
+    async def week_comment(student_id: int, body: TextIn, svc: Svc, pro: Pro):
+        if not await svc.set_week_comment(pro["tg_id"], student_id, body.text):
+            raise HTTPException(404)
+        return await svc.student_card(pro["tg_id"], student_id)
+
+    @app.put("/v1/pro/students/{student_id}/target")
+    async def student_target(student_id: int, body: TargetIn, svc: Svc, pro: Pro):
+        if not await svc.set_student_target(pro["tg_id"], student_id, body.kcal):
+            raise HTTPException(404)
+        return await svc.student_card(pro["tg_id"], student_id)
+
+    @app.put("/v1/pro/students/{student_id}/note")
+    async def student_note(student_id: int, body: TextIn, svc: Svc, pro: Pro):
+        if not await svc.set_note(pro["tg_id"], student_id, body.text):
+            raise HTTPException(404)
+        return {"ok": True}
+
     @app.get("/v1/pro/queue")
     async def pro_queue(svc: Svc, pro: Pro):
         return {"meals": await svc.pro_queue(pro["tg_id"])}

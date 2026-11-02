@@ -524,7 +524,11 @@ class Service:
         reviewed = await self.db.fetchone(
             "SELECT COUNT(*) AS n FROM meals WHERE user_id = ? AND received_at >= ? AND reviewed_at IS NOT NULL",
             (user_id, week_start))
+        # Итог недели от специалиста главнее; без него — последний комментарий к разбору за неделю
         comment = await self.db.fetchone(
+            "SELECT text AS comment FROM week_comments WHERE student_id = ? AND week_start = ?",
+            (user_id, self.week_start(ts)))
+        comment = comment or await self.db.fetchone(
             "SELECT comment FROM meals WHERE user_id = ? AND received_at >= ? AND comment IS NOT NULL"
             " ORDER BY reviewed_at DESC, received_at DESC LIMIT 1", (user_id, week_start))
         coach = await self.db.get_coach(user["coach_code"])
@@ -654,6 +658,75 @@ class Service:
         if user and user["role"] == "operator":
             return "channel = 'app' AND role = 'client' AND coach_code IS NULL", (), "Клиент"
         return None
+
+    @staticmethod
+    def week_start(ts: int) -> str:
+        """Понедельник недели по Алматы — ключ итога недели."""
+        from datetime import timedelta
+        d = datetime.fromtimestamp(ts, ALMATY).date()
+        return (d - timedelta(days=d.weekday())).isoformat()
+
+    async def pro_student(self, pro_user_id: int, student_id: int):
+        """Ученик (клиент), которого видит этот проверяющий, или None."""
+        scope = await self._scope(pro_user_id)
+        if scope is None:
+            return None
+        cond, args, _ = scope
+        return await self.db.fetchone(f"SELECT * FROM users WHERE tg_id = ? AND {cond}", (student_id, *args))
+
+    async def student_card(self, pro_user_id: int, student_id: int) -> dict | None:
+        """Всё про ученика для специалиста: параметры, норма, неделя, серия, вес, приёмы пищи за 14 дней, заметка."""
+        u = await self.pro_student(pro_user_id, student_id)
+        if u is None:
+            return None
+        from .advice import targets_for
+        kcal, protein = targets_for(u)
+        labels = await self.student_labels(pro_user_id)
+        rows = await self.db.fetchall(
+            "SELECT id FROM meals WHERE user_id = ? AND received_at >= ? AND status != 'failed' ORDER BY received_at DESC",
+            (student_id, self.db.clock() - 14 * 86400))
+        note = await self.db.fetchone("SELECT text FROM pro_notes WHERE student_id = ? AND pro_id = ?",
+                                      (student_id, pro_user_id))
+        return {
+            "user_id": student_id, "label": labels.get(student_id, "Ученик"), "goal": u["goal"],
+            "profile": {k: u[k] for k in ("sex", "birth_year", "height_cm", "weight_kg", "activity")},
+            "targets": {"kcal": kcal, "protein": protein, "set_by_pro": bool(u["kcal_target"])},
+            "week": await self.week_view(student_id), "streak": await self.streak_view(student_id),
+            "weights": await self.weights_view(student_id),
+            "meals": [await self.meal_view(r["id"], student_id) for r in rows],
+            "note": note["text"] if note else "",
+        }
+
+    async def set_week_comment(self, pro_user_id: int, student_id: int, text: str) -> bool:
+        if await self.pro_student(pro_user_id, student_id) is None:
+            return False
+        ts = self.db.clock()
+        text = text.strip()[:2000]
+        if not text:
+            await self.db.execute("DELETE FROM week_comments WHERE student_id = ? AND week_start = ?",
+                                  (student_id, self.week_start(ts)))
+        else:
+            await self.db.execute(
+                "INSERT OR REPLACE INTO week_comments (student_id, week_start, pro_id, text, ts) VALUES (?, ?, ?, ?, ?)",
+                (student_id, self.week_start(ts), pro_user_id, text, ts))
+        await self.db.log_event("week_comment", student_id, reviewer=pro_user_id)
+        return True
+
+    async def set_student_target(self, pro_user_id: int, student_id: int, kcal: int | None) -> bool:
+        """Ориентир калорий от специалиста (как /target в Telegram). None — вернуть личный расчёт."""
+        if await self.pro_student(pro_user_id, student_id) is None:
+            return False
+        await self.db.update_user(student_id, kcal_target=kcal)
+        await self.db.log_event("target_set", student_id, reviewer=pro_user_id, kcal=kcal)
+        return True
+
+    async def set_note(self, pro_user_id: int, student_id: int, text: str) -> bool:
+        """Заметка специалиста об ученике — видит только он сам."""
+        if await self.pro_student(pro_user_id, student_id) is None:
+            return False
+        await self.db.execute("INSERT OR REPLACE INTO pro_notes (student_id, pro_id, text, ts) VALUES (?, ?, ?, ?)",
+                              (student_id, pro_user_id, text.strip()[:4000], self.db.clock()))
+        return True
 
     async def is_reviewer(self, user_id: int) -> bool:
         return await self._scope(user_id) is not None

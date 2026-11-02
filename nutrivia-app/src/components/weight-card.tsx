@@ -13,8 +13,8 @@ import { Txt } from './txt';
 const W = 300;
 const H = 72;
 
-/** Вес за 90 дней: последняя цифра, изменение и линия. Нажатие — записать вес. */
-export function WeightCard({ data }: { data: ServerWeights | null }) {
+/** Вес за 90 дней: последняя цифра, изменение и линия. Нажатие — записать вес (readOnly — для специалиста). */
+export function WeightCard({ data, readOnly }: { data: ServerWeights | null; readOnly?: boolean }) {
   const c = useColors();
   const pts = data?.points ?? [];
   const last = pts[pts.length - 1];
@@ -29,8 +29,9 @@ export function WeightCard({ data }: { data: ServerWeights | null }) {
 
   return (
     <Pressable
-      accessibilityRole="button"
-      accessibilityLabel={last ? `Вес ${kgText(last.kg)} кг. Записать новый вес` : 'Записать вес'}
+      accessibilityRole={readOnly ? undefined : 'button'}
+      accessibilityLabel={last ? `Вес ${kgText(last.kg)} кг${readOnly ? '' : '. Записать новый вес'}` : readOnly ? 'Вес не записан' : 'Записать вес'}
+      disabled={readOnly}
       onPress={() => router.push('/weight')}
       style={({ pressed }) => [styles.card, { backgroundColor: c.surface, opacity: pressed ? 0.85 : 1 }]}>
       <View style={styles.row}>
@@ -44,7 +45,7 @@ export function WeightCard({ data }: { data: ServerWeights | null }) {
               {change === 0 ? 'без изменений' : `${change > 0 ? '+' : '−'}${kgText(Math.abs(change))} кг с ${dayLabel(pts[0].date)}`}
             </Txt>
           )}
-          <Txt variant="headline" tone="accent" style={{ fontSize: 15 }}>{last ? '+ Записать' : 'Записать вес'}</Txt>
+          {!readOnly && <Txt variant="headline" tone="accent" style={{ fontSize: 15 }}>{last ? '+ Записать' : 'Записать вес'}</Txt>}
         </View>
       </View>
       {pts.length > 1 ? (
@@ -54,7 +55,9 @@ export function WeightCard({ data }: { data: ServerWeights | null }) {
         </Svg>
       ) : (
         <Txt variant="caption" tone="muted">
-          {last ? 'Взвешивайтесь раз в неделю в одно время — здесь появится линия.' : 'Запишите вес — по нему уточним ориентир калорий.'}
+          {readOnly
+            ? last ? 'Пока одно взвешивание.' : 'Вес ещё не записывали.'
+            : last ? 'Взвешивайтесь раз в неделю в одно время — здесь появится линия.' : 'Запишите вес — по нему уточним ориентир калорий.'}
         </Txt>
       )}
     </Pressable>

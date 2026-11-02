@@ -572,3 +572,35 @@ def test_recent_dishes(client):
         client.post("/v1/meals/manual", headers=h, json={"items": [{"dish_id": "oatmeal", "grams": 250}]})
     client.post("/v1/meals/manual", headers=h, json={"items": [{"dish_id": "plov", "grams": 300}]})
     assert [d["id"] for d in client.get("/v1/dishes/recent", headers=h).json()] == ["oatmeal", "plov"]
+
+
+def test_student_card_week_comment_target_note(client):
+    h_pro, pro = login(client, phone="+77070000021", role="nutritionist", name="Алан")
+    h_st, st = login(client, phone="+77070000022", invite_code=pro["me"]["pro"]["invite_code"])
+    h_other, other_pro = login(client, phone="+77070000023", role="trainer", name="Чужой")
+    sid = st["me"]["user_id"]
+    upload(client, h_st)
+    client.post("/v1/weights", headers=h_st, json={"kg": 82})
+
+    card = client.get(f"/v1/pro/students/{sid}", headers=h_pro).json()
+    assert card["label"] == "Ученик 1" and len(card["meals"]) == 1 and card["weights"]["points"][0]["kg"] == 82
+    assert client.get(f"/v1/pro/students/{sid}", headers=h_other).status_code == 404  # чужой ученик
+
+    # итог недели — клиент видит его в «Прогрессе» вместо комментария к фото
+    client.post(f"/v1/pro/students/{sid}/week-comment", headers=h_pro, json={"text": "Отличная неделя, белка хватает"})
+    week = client.get("/v1/progress", headers=h_st).json()["week"]
+    assert week["coach"] == {"name": "Алан", "comment": "Отличная неделя, белка хватает"}
+
+    # ориентир от специалиста главнее личного; null возвращает расчёт
+    card = client.put(f"/v1/pro/students/{sid}/target", headers=h_pro, json={"kcal": 1700}).json()
+    assert card["targets"] == {"kcal": 1700, "protein": card["targets"]["protein"], "set_by_pro": True}
+    assert client.get("/v1/today", headers=h_st).json()["targets"]["kcal"] == 1700
+    assert client.put(f"/v1/pro/students/{sid}/target", headers=h_pro, json={"kcal": None}).json()["targets"]["set_by_pro"] is False
+    assert client.put(f"/v1/pro/students/{sid}/target", headers=h_pro, json={"kcal": 300}).status_code == 422
+
+    # заметка видна только своему специалисту
+    client.put(f"/v1/pro/students/{sid}/note", headers=h_pro, json={"text": "Не ест после 20:00"})
+    assert client.get(f"/v1/pro/students/{sid}", headers=h_pro).json()["note"] == "Не ест после 20:00"
+    assert client.put(f"/v1/pro/students/{sid}/note", headers=h_other, json={"text": "x"}).status_code == 404
+    # клиент в кабинет не попадает
+    assert client.get(f"/v1/pro/students/{sid}", headers=h_st).status_code == 403

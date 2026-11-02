@@ -268,6 +268,31 @@ export const proSend = (id: number) => request<ProMeal>(`/v1/pro/meals/${id}/sen
 
 export const getStudents = () => request<{ students: Student[]; me: Me }>('/v1/pro/students');
 
+export type StudentCard = {
+  user_id: number;
+  label: string;
+  goal: string | null;
+  profile: NonNullable<Me['profile']>;
+  targets: NonNullable<Me['targets']>;
+  week: ServerProgress['week'];
+  streak: ServerProgress['streak'];
+  weights: ServerWeights;
+  meals: ServerMeal[];
+  note: string;
+};
+
+export const getStudentCard = (id: number) => request<StudentCard>(`/v1/pro/students/${id}`);
+
+export const setWeekComment = (id: number, text: string) =>
+  request<StudentCard>(`/v1/pro/students/${id}/week-comment`, { method: 'POST', ...json({ text }) });
+
+/** Ориентир калорий от специалиста; null — вернуть личный расчёт. */
+export const setStudentTarget = (id: number, kcal: number | null) =>
+  request<StudentCard>(`/v1/pro/students/${id}/target`, { method: 'PUT', ...json({ kcal }) });
+
+export const setStudentNote = (id: number, text: string) =>
+  request<{ ok: boolean }>(`/v1/pro/students/${id}/note`, { method: 'PUT', ...json({ text }) });
+
 /** demo:plov — демо-снимок для симулятора, где нет камеры. */
 async function resolvePhoto(uri: string) {
   if (uri === 'demo:plov') {
