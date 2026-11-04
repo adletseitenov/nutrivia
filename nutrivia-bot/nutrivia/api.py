@@ -25,12 +25,13 @@ from .config import ALMATY, Config, load_config
 from .db import Database
 from .engine import DishBase
 from .matcher import normalize
-from .ratelimit import RateLimiter
+from .ratelimit import RateLimiter, client_ip
 from .service import Service
 from .vision import VisionProvider, make_vision
 
 log = logging.getLogger(__name__)
 MAX_PHOTO_BYTES = 8 * 1024 * 1024
+MAX_BODY_BYTES = MAX_PHOTO_BYTES + 512 * 1024  # фото + поля формы
 
 
 def sniff_image(data: bytes) -> str | None:
@@ -124,9 +125,13 @@ def create_app(cfg: Config | None = None, vision: VisionProvider | None = None, 
     async def guard(request: Request, call_next):
         """Частота запросов + заголовки безопасности на каждый ответ."""
         auth = request.headers.get("authorization", "")
-        ip = request.headers.get("cf-connecting-ip") or (request.client.host if request.client else "?")
+        ip = client_ip(request.headers, request.client.host if request.client else None)
         wait = limiter.check(request.url.path, request.method, ip, auth[7:] if auth.startswith("Bearer ") else None)
-        if wait is not None:
+        size = request.headers.get("content-length", "")
+        if size.isdigit() and int(size) > MAX_BODY_BYTES:
+            # Не даём залить гигабайт: multipart иначе целиком ляжет во временный файл до проверки размера фото
+            resp = JSONResponse({"code": "too_large", "message": "Фото слишком большое."}, status_code=413)
+        elif wait is not None:
             resp = JSONResponse({"code": "too_many", "message": "Слишком много запросов. Попробуйте чуть позже.",
                                  "retry_after": wait}, status_code=429, headers={"Retry-After": str(wait)})
         else:
@@ -698,7 +703,11 @@ def create_app(cfg: Config | None = None, vision: VisionProvider | None = None, 
 def main() -> None:
     import uvicorn
     logging.basicConfig(level=logging.INFO)
-    uvicorn.run(create_app(), host="0.0.0.0", port=int(os.environ.get("PORT", "8000")), proxy_headers=True)
+    # За прокси хостинга (TRUST_PROXY=1) берём от него схему https — ссылки из админки будут https://.
+    # Адрес клиента для лимитов считаем сами (ratelimit.client_ip), не из uvicorn.
+    trust = "*" if os.environ.get("TRUST_PROXY") else "127.0.0.1"
+    uvicorn.run(create_app(), host="0.0.0.0", port=int(os.environ.get("PORT", "8000")), proxy_headers=True,
+                forwarded_allow_ips=trust)
 
 
 if __name__ == "__main__":

@@ -77,8 +77,9 @@ async def main(reset: bool) -> None:
             continue
         if not reset:
             sys.exit(f"{raw} уже есть в {cfg.db_path}. Запустите с --reset, чтобы пересоздать демо-аккаунты.")
+        # как «Удалить аккаунт» в приложении: сначала входы — иначе новый аккаунт с тем же id унаследует чужую сессию
+        await auth.forget_user(uid)
         await svc.delete_user(uid)
-        await db.execute("DELETE FROM app_accounts WHERE user_id = ?", (uid,))
         await db.execute("DELETE FROM pros WHERE user_id = ?", (uid,))
 
     now = datetime.now(ALMATY)

@@ -680,7 +680,8 @@ def test_rate_limit_on_login(client):
     t[0] = 61
     assert rl.check("/v1/auth/sms/start", "POST", "1.1.1.1", None) is None  # окно прошло
     # в приложении — 429 с понятным текстом
-    for _ in range(20):
+    from nutrivia.ratelimit import AUTH_LIMIT
+    for _ in range(AUTH_LIMIT):
         client.post("/v1/auth/sms/start", json={"phone": "+77070000777"})
     r = client.post("/v1/auth/sms/start", json={"phone": "+77070000778"})
     assert r.status_code == 429 and r.json()["code"] == "too_many" and r.headers["Retry-After"]
@@ -772,3 +773,31 @@ def test_subscription_trial_claim_confirm_and_paywall(client, monkeypatch):
     # специалисту подписка не нужна
     h_pro, _ = login(client, phone="+77070000061", role="trainer", name="Ерлан")
     assert client.get("/v1/subscription", headers=h_pro).json()["status"] == "free"
+
+
+def test_client_ip_behind_proxy(monkeypatch):
+    from nutrivia.ratelimit import client_ip
+    h = {"x-forwarded-for": "6.6.6.6, 5.5.5.5", "cf-connecting-ip": "7.7.7.7"}
+    monkeypatch.delenv("TRUST_PROXY", raising=False)
+    assert client_ip(h, "10.0.0.1") == "10.0.0.1"  # без прокси заголовкам не верим
+    monkeypatch.setenv("TRUST_PROXY", "1")
+    assert client_ip(h, "10.0.0.1") == "5.5.5.5"   # последний — тот, что дописал прокси; первый подделан
+    assert client_ip({}, "10.0.0.1") == "10.0.0.1"
+
+
+def test_rate_limiter_forgets_idle_keys():
+    from nutrivia.ratelimit import RateLimiter
+    t = [0.0]
+    rl = RateLimiter(rules=(("/v1/auth/", "POST", 3, 60, "ip"),), clock=lambda: t[0])
+    for i in range(500):
+        rl.check("/v1/auth/sms/start", "POST", f"ip{i}", None)
+    t[0] = 1000
+    for _ in range(500):
+        rl.check("/health", "GET", "x", None)
+    assert len(rl.hits) == 0
+
+
+def test_huge_upload_rejected_before_reading(client):
+    h = register(client)
+    r = client.post("/v1/meals", headers={**h, "content-length": str(50 * 1024 * 1024)}, content=b"x")
+    assert r.status_code == 413 and r.json()["code"] == "too_large"

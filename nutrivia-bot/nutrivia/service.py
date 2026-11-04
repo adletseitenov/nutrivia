@@ -445,7 +445,9 @@ class Service:
     async def over_limit(self, tg_id: int, ts: int | None = None) -> bool:
         start, end = local_day_bounds(ts)
         row = await self.db.fetchone(
-            "SELECT COUNT(*) AS n FROM meals WHERE user_id = ? AND received_at >= ? AND received_at < ?",
+            # лимит на фото: еда, записанная вручную, его не тратит
+            "SELECT COUNT(*) AS n FROM meals WHERE user_id = ? AND received_at >= ? AND received_at < ?"
+            " AND status != 'manual'",
             (tg_id, start, end))
         return row["n"] >= self.cfg.daily_photo_limit
 

@@ -86,6 +86,15 @@ async def test_daily_limit(svc):
     assert (await svc.receive_photo(1, b"c", ts=NOON + 120)).status == "limit"
 
 
+async def test_manual_meals_do_not_use_photo_limit(svc):
+    svc.cfg.daily_photo_limit = 1
+    await onboard(svc)
+    svc.db.clock = lambda: NOON
+    for _ in range(3):
+        assert await svc.manual_meal(1, [("plov", 200)], NOON) is not None
+    assert (await svc.receive_photo(1, b"a", ts=NOON + 60)).status == "draft"
+
+
 async def test_night_photo(svc):
     await onboard(svc)
     night = int(datetime(2026, 11, 4, 23, 30, tzinfo=ALMATY).timestamp())
