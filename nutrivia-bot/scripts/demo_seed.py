@@ -82,7 +82,9 @@ async def main(reset: bool) -> None:
         await svc.delete_user(uid)
         await db.execute("DELETE FROM pros WHERE user_id = ?", (uid,))
 
-    now = datetime.now(ALMATY)
+    # DEMO_NOW=2026-11-05T17:10 — собрать демо «как будто сейчас» это время (скрины, футаж); по умолчанию — сейчас
+    now = datetime.fromisoformat(os.environ["DEMO_NOW"]).replace(tzinfo=ALMATY) if os.environ.get("DEMO_NOW") \
+        else datetime.now(ALMATY)
     first = (now - timedelta(days=len(DAYS) - 1)).replace(hour=7, minute=0, second=0, microsecond=0)
 
     async def account(raw: str, role: str, name: str | None, ts: int, **profile) -> int:
@@ -136,7 +138,7 @@ async def main(reset: bool) -> None:
     db.clock = lambda: int(now.timestamp()) - 25 * 60
     await svc.receive_photo(others[0], photo, "image/png", ts=int(now.timestamp()) - 25 * 60)
 
-    db.clock = real_clock
+    db.clock = real_clock if not os.environ.get("DEMO_NOW") else (lambda: int(now.timestamp()))
     await svc.set_week_comment(trainer, client, WEEK_COMMENT)
 
     # Лента: пост клиента с приёмом пищи и рецепт другого ученика, взаимные лайки
@@ -150,7 +152,7 @@ async def main(reset: bool) -> None:
 
     _, status = await svc.make_operator(auth, OPERATOR)
     await db.conn.commit()
-    streak = await svc.streak_view(client)
+    streak = await svc.streak_view(client, int(now.timestamp()))
     print(f"База: {cfg.db_path}")
     print(f"Клиент   {CLIENT} — серия {streak['days']} дн., стадия {streak['stage']}, тренер с кодом {code}")
     print(f"Тренер   {TRAINER} — учеников {1 + len(others)}, один разбор ждёт проверки")
