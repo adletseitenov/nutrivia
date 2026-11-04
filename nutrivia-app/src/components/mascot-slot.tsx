@@ -20,11 +20,29 @@ export const MASCOT_STAGES: Partial<Record<number, ImageSource>> = {
 
 const STAGES = 5;
 
-export function MascotSlot({ stage, size = 120 }: { stage?: number; size?: number }) {
+/** Имена стадий — как у художника: росток → бутон → цветок → завязь → голубика. */
+export const STAGE_NAMES = ['Росток', 'Бутон', 'Цветок', 'Завязь', 'Голубика'];
+
+export function stageName(stage: number): string {
+  return STAGE_NAMES[Math.min(STAGES, Math.max(1, stage)) - 1];
+}
+
+/** locked — стадия ещё не открыта: силуэт без цвета (тот же рисунок художника, только тоном). */
+export function MascotSlot({ stage, size = 120, locked = false }: { stage?: number; size?: number; locked?: boolean }) {
   const c = useColors();
   const src = stage ? MASCOT_STAGES[stage] : undefined;
   const label = stage ? `Голубика, стадия ${stage} из ${STAGES}` : 'Nutrivia';
-  if (src) return <Image source={src} style={{ width: size, height: size }} contentFit="contain" accessibilityLabel={label} />;
+  if (src) {
+    return (
+      <Image
+        source={src}
+        style={{ width: size, height: size, opacity: locked ? 0.35 : 1 }}
+        tintColor={locked ? c.muted : undefined}
+        contentFit="contain"
+        accessibilityLabel={locked ? `${label}, ещё не открыта` : label}
+      />
+    );
+  }
 
   const stroke = Math.max(3, size * 0.09);
   const r = (size - stroke) / 2 - size * 0.06;

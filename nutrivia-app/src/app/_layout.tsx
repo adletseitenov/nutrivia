@@ -81,6 +81,7 @@ export default function RootLayout() {
           <Stack.Screen name="legal" />
           <Stack.Screen name="subscription" />
           <Stack.Screen name="streak" />
+          <Stack.Screen name="stage-up" options={{ presentation: 'fullScreenModal', animation: 'fade', gestureEnabled: false }} />
           <Stack.Screen name="fridge" />
         </Stack>
       </AppStoreProvider>

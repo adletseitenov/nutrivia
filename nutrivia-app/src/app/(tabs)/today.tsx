@@ -1,5 +1,5 @@
 import { router, useFocusEffect } from 'expo-router';
-import { useCallback, useState } from 'react';
+import { useCallback, useEffect, useState } from 'react';
 import { Pressable, StyleSheet, View } from 'react-native';
 
 import { getToday, type ServerToday } from '@/api/client';
@@ -16,6 +16,7 @@ import { mealFromServer, mealNutrients, refreshToday, useAppStore, useTargets, u
 import { font, radius, space } from '@/theme/tokens';
 import { useColors } from '@/theme/use-colors';
 import { t } from '@/lib/i18n';
+import { kvGet, kvSet } from '@/lib/kv';
 
 export default function Today() {
   const c = useColors();
@@ -27,6 +28,7 @@ export default function Today() {
   // Выбранный прошлый день из полосы; null — сегодня (он живёт в сторе и обновляется сам)
   const [picked, setPicked] = useState<string | null>(null);
   const [past, setPast] = useState<ServerToday | null>(null);
+  useStageUp(state.me?.user_id, streak?.stage, streak?.days);
 
   // Свежий день с сервера при каждом открытии вкладки (статусы разборов, правки нутрициолога)
   useFocusEffect(
@@ -162,3 +164,20 @@ const styles = StyleSheet.create({
   empty: { borderRadius: radius.m, padding: space[5], alignItems: 'center', gap: space[3] },
   sectionHead: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'baseline' },
 });
+
+/** Голубика выросла с прошлого раза — показать «Новая стадия» один раз. Первый вход только запоминает стадию. */
+function useStageUp(userId: number | undefined, stage: number | undefined, days: number | undefined) {
+  useEffect(() => {
+    if (!userId || !stage) return;
+    const key = `nutrivia.stage.${userId}`;
+    let cancelled = false;
+    kvGet(key).then((seen) => {
+      if (cancelled) return;
+      kvSet(key, String(stage));
+      if (seen && stage > Number(seen)) {
+        router.push({ pathname: '/stage-up', params: { stage: String(stage), days: String(days ?? 0) } });
+      }
+    });
+    return () => { cancelled = true; };
+  }, [userId, stage, days]);
+}
