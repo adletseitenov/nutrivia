@@ -99,6 +99,9 @@ def build(cfg: Config, svc: Service) -> tuple[Router, Router]:
     # ---------- личка клиента ----------
     @private.message(CommandStart())
     async def start(msg: Message, command: CommandObject):
+        # Ссылку из приложения некоторые клиенты Telegram теряют (бот открыли поиском) — видно по логу
+        log.info("/start from chat %s, payload: %s", msg.chat.id,
+                 "app-link" if (command.args or "").startswith(LINK_PREFIX) else (command.args or "none"))
         if (command.args or "").startswith(LINK_PREFIX):  # привязка из профиля приложения
             uid = await consume_link(svc.db, command.args, msg.chat.id)
             await msg.answer(
