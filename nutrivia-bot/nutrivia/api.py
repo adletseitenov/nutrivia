@@ -21,7 +21,7 @@ from pydantic import BaseModel, Field
 from rapidfuzz import fuzz, process
 
 from .auth import AuthError, ConsoleSms, ManualCodes, MobizonSms, SmsAuth, SmsProvider
-from .config import ALMATY, Config, load_config
+from .config import ALMATY, Config, load_config, public_url
 from .db import Database
 from .engine import DishBase
 from .matcher import normalize
@@ -46,14 +46,46 @@ def sniff_image(data: bytes) -> str | None:
 
 
 class Notifier:
-    """Карточки в группу проверки через Telegram-бота. Без BOT_TOKEN — тихо ничего не делает."""
+    """Telegram-бот внутри сервера (BOT_TOKEN): карточки в группу проверки, уведомления клиентам
+    (nutrivia/notify.py) и сам бот — привязка /start app_… и бот-консьерж фазы 0. Без BOT_TOKEN — тихо ничего.
+    BOT_POLLING=0 — бот не слушает обновления (если он запущен отдельно: python -m nutrivia.bot)."""
 
     def __init__(self, cfg: Config, svc: Service):
-        self.svc = svc
+        self.cfg, self.svc = cfg, svc
         self.bot = None
+        self.username: str | None = None
+        self.tasks: list = []
         if cfg.bot_token:
             from aiogram import Bot
-            self.bot = Bot(cfg.bot_token)
+            try:
+                self.bot = Bot(cfg.bot_token.strip())
+            except Exception:  # опечатка в токене не должна ронять сервер — без бота всё остальное работает
+                log.error("BOT_TOKEN не похож на токен от @BotFather — Telegram выключен")
+
+    async def start(self) -> None:
+        if self.bot is None:
+            return
+        import asyncio
+        from aiogram import Dispatcher
+        from .bot import build
+        try:
+            self.username = (await self.bot.get_me()).username
+        except Exception:
+            log.exception("BOT_TOKEN задан, но Telegram его не принял — уведомления выключены")
+            await self.bot.session.close()
+            self.bot = None
+            return
+        self.tasks.append(asyncio.create_task(self._reminders()))
+        if os.environ.get("BOT_POLLING", "1") != "0":
+            dp = Dispatcher()
+            dp.include_routers(*build(self.cfg, self.svc))
+            self.tasks.append(asyncio.create_task(dp.start_polling(self.bot, handle_signals=False)))
+        self.svc.telegram_ready = True
+        log.info("Telegram-бот @%s подключён", self.username)
+
+    def sender(self):
+        from .bot import telegram_sender
+        return telegram_sender(self.bot)
 
     async def review_card(self, chat_id: int, meal_id: int, image: bytes, text: str) -> None:
         if self.bot is None:
@@ -64,7 +96,30 @@ class Notifier:
         except Exception:
             log.exception("review card for meal %s failed", meal_id)
 
+    async def review_done(self, meal_id: int) -> None:
+        if self.bot is None:
+            return
+        from .notify import review_done
+        try:
+            await review_done(self.svc, meal_id, self.sender())
+        except Exception:
+            log.exception("review notice for meal %s failed", meal_id)
+
+    async def _reminders(self) -> None:
+        import asyncio
+        from .notify import due_reminders
+        send = self.sender()
+        while True:
+            try:
+                for chat_id, text, path in await due_reminders(self.svc):
+                    await send(chat_id, text, path)
+            except Exception:
+                log.exception("telegram reminders tick failed")
+            await asyncio.sleep(60)
+
     async def close(self) -> None:
+        for task in self.tasks:
+            task.cancel()
         if self.bot is not None:
             await self.bot.session.close()
 
@@ -114,6 +169,7 @@ def create_app(cfg: Config | None = None, vision: VisionProvider | None = None, 
         app.state.svc = svc
         app.state.auth = auth
         app.state.notifier = Notifier(cfg, svc)
+        await app.state.notifier.start()
         yield
         await app.state.notifier.close()
         await db.close()
@@ -272,6 +328,22 @@ def create_app(cfg: Config | None = None, vision: VisionProvider | None = None, 
             raise AuthError(status, JOIN_MESSAGES[status], 409 if status == "full" else 400)
         return await svc.me_view(user["tg_id"])
 
+    @app.post("/v1/me/telegram")
+    async def telegram_link(svc: Svc, user: User):
+        """Ссылка на бота для привязки уведомлений: открыть → «Старт» → готово. Живёт 15 минут."""
+        from .notify import LINK_PREFIX, new_link_token
+        username = app.state.notifier.username
+        if not username:
+            raise AuthError("no_bot", "Telegram пока не подключён на сервере.", 503)
+        token = await new_link_token(svc.db, user["tg_id"])
+        return {"url": f"https://t.me/{username}?start={LINK_PREFIX}{token}"}
+
+    @app.delete("/v1/me/telegram")
+    async def telegram_unlink(svc: Svc, user: User):
+        from .notify import unlink
+        await unlink(svc.db, user["tg_id"])
+        return await svc.me_view(user["tg_id"])
+
     @app.get("/v1/pro/students")
     async def students(svc: Svc, user: User):
         """Для тренера и нутрициолога: ученики, их калории за сегодня и непроверенные разборы."""
@@ -363,11 +435,12 @@ def create_app(cfg: Config | None = None, vision: VisionProvider | None = None, 
         return await svc.pro_meal_view(pro["tg_id"], meal_id)
 
     @app.post("/v1/pro/meals/{meal_id}/send")
-    async def pro_send(meal_id: int, svc: Svc, pro: Pro):
+    async def pro_send(meal_id: int, svc: Svc, pro: Pro, background: BackgroundTasks):
         status = await svc.pro_send(pro["tg_id"], meal_id)
         if status != "ok":
             code, message = SEND_ERRORS[status]
             raise AuthError(status, message, code)
+        background.add_task(app.state.notifier.review_done, meal_id)
         return await svc.pro_meal_view(pro["tg_id"], meal_id)
 
     @app.get("/v1/users/me/export")
@@ -634,7 +707,7 @@ def create_app(cfg: Config | None = None, vision: VisionProvider | None = None, 
     async def admin_code(body: PhoneIn, request: Request):
         """Код входа для пилота без SMS — как scripts/pilot_code, но кнопкой. Ссылка — адрес, с которого открыта админка."""
         phone, code = await app.state.auth.issue_manual(body.phone)
-        link = os.environ.get("PUBLIC_URL") or str(request.base_url).rstrip("/")
+        link = public_url() or str(request.base_url).rstrip("/")
         text = (f"Привет! Это Nutrivia — фото еды → калории и разбор от нутрициолога.\n"
                 f"1. Открой ссылку в Safari или Chrome на телефоне: {link}\n"
                 f"2. Чтобы было как приложение: «Поделиться» → «На экран Домой».\n"

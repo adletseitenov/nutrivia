@@ -1,8 +1,8 @@
 import { router } from 'expo-router';
-import { useEffect, useState } from 'react';
-import { Platform, Pressable, Share, StyleSheet, View } from 'react-native';
+import { useCallback, useEffect, useState } from 'react';
+import { Alert, AppState, Linking, Platform, Pressable, Share, StyleSheet, View } from 'react-native';
 
-import { bodyFromMe, deleteMe, exportMe, getSubscription, logout, patchLang, type Subscription } from '@/api/client';
+import { bodyFromMe, deleteMe, exportMe, getMe, getSubscription, logout, patchLang, telegramLink, telegramUnlink, type Subscription } from '@/api/client';
 import { Icon } from '@/components/icon';
 import { Screen } from '@/components/screen';
 import { Txt } from '@/components/txt';
@@ -13,6 +13,9 @@ import { font, radius, space } from '@/theme/tokens';
 import { useColors } from '@/theme/use-colors';
 import { FEATURES } from '@/lib/features';
 import { getLang, setLang, t } from '@/lib/i18n';
+
+/** Ссылка на бота живёт 15 минут — берём с запасом. */
+const linkFresh = (at: number) => Date.now() - at < 14 * 60 * 1000;
 
 export default function Profile() {
   const c = useColors();
@@ -49,6 +52,41 @@ export default function Profile() {
     if (REMINDERS_SUPPORTED) remindersOn().then(setRemindersState, () => setRemindersState(false));
   }, []);
 
+  // Telegram: ссылку берём заранее — открыть её надо прямо в нажатии, иначе Safari сочтёт это всплывающим окном
+  const telegram = state.me?.telegram;
+  const [tgLink, setTgLink] = useState<{ url: string; at: number } | null>(null);
+  const refreshMe = useCallback(() => getMe().then((me) => dispatch({ type: 'setMe', me }), () => {}), [dispatch]);
+  useEffect(() => {
+    if (telegram?.available && !telegram.linked) telegramLink().then((r) => setTgLink({ url: r.url, at: Date.now() }), () => {});
+  }, [telegram?.available, telegram?.linked]);
+  useEffect(() => {
+    // вернулись из Telegram после «Старт» — подтянуть, что привязка прошла
+    const sub = AppState.addEventListener('change', (s) => { if (s === 'active') refreshMe(); });
+    return () => sub.remove();
+  }, [refreshMe]);
+
+  function onTelegram() {
+    if (telegram?.linked) {
+      const off = () => telegramUnlink().then((me) => dispatch({ type: 'setMe', me }), () => {});
+      if (Platform.OS === 'web') {
+        if (window.confirm(t('Отключить уведомления в Telegram?'))) off();
+      } else {
+        Alert.alert(t('Отключить уведомления в Telegram?'), '', [
+          { text: t('Отмена'), style: 'cancel' },
+          { text: t('Отключить'), style: 'destructive', onPress: off },
+        ]);
+      }
+      return;
+    }
+    if (tgLink && linkFresh(tgLink.at)) {
+      Linking.openURL(tgLink.url);
+      setTgLink(null);
+      telegramLink().then((r) => setTgLink({ url: r.url, at: Date.now() }), () => {}); // ссылка одноразовая — сразу следующая
+    } else {
+      telegramLink().then((r) => Linking.openURL(r.url), () => {});
+    }
+  }
+
   const rows: { label: string; value: string; onPress?: () => void }[] = [
     { label: 'Цель', value: goal.title, onPress: () => router.push('/goal') },
     {
@@ -70,6 +108,13 @@ export default function Profile() {
             patchLang(next).then((me) => dispatch({ type: 'setMe', me }), () => {});
             setLang(next);
           },
+        }]
+      : []),
+    ...(telegram?.available && state.me?.role === 'client'
+      ? [{
+          label: 'Уведомления в Telegram',
+          value: telegram.linked ? 'Подключены' : 'Подключить',
+          onPress: onTelegram,
         }]
       : []),
     ...(REMINDERS_SUPPORTED

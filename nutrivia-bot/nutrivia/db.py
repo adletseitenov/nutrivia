@@ -80,6 +80,16 @@ CREATE TABLE IF NOT EXISTS ai_requests (
     latency_ms INTEGER,
     error TEXT
 );
+CREATE TABLE IF NOT EXISTS tg_links (
+    user_id INTEGER PRIMARY KEY,
+    chat_id INTEGER NOT NULL,
+    linked_at INTEGER NOT NULL
+);
+CREATE TABLE IF NOT EXISTS tg_link_tokens (
+    token TEXT PRIMARY KEY,
+    user_id INTEGER NOT NULL,
+    expires_at INTEGER NOT NULL
+);
 CREATE TABLE IF NOT EXISTS jobs_done (
     key TEXT PRIMARY KEY,
     ts INTEGER NOT NULL
@@ -237,6 +247,8 @@ class Database:
                            (tg_id, tg_id))
         await self.execute("DELETE FROM posts WHERE user_id = ?", (tg_id,))
         await self.execute("DELETE FROM payments WHERE user_id = ?", (tg_id,))
+        await self.execute("DELETE FROM tg_links WHERE user_id = ?", (tg_id,))
+        await self.execute("DELETE FROM tg_link_tokens WHERE user_id = ?", (tg_id,))
         await self.execute("DELETE FROM users WHERE tg_id = ?", (tg_id,))
         # специалист: ученики остаются, но отвязываются; код приглашения перестаёт работать
         pro = await self.fetchone("SELECT code FROM pros WHERE user_id = ?", (tg_id,))

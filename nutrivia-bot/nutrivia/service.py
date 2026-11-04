@@ -784,6 +784,7 @@ class Service:
 
     # --- типы аккаунтов в приложении: для себя, тренер, нутрициолог ---
     PRO_ROLES = ("trainer", "nutritionist")
+    telegram_ready = False  # бот подключён и Telegram принял токен (ставит api.Notifier.start)
     STUDENT_LIMIT = {"trainer": 5}  # тренер ведёт до 5 учеников (Алан, 27.10); у нутрициолога лимита пока нет
 
     async def create_app_user(self, role: str, lang: str, goal: str | None, name: str | None) -> dict:
@@ -845,6 +846,9 @@ class Service:
                 "coach": {"name": coach["name"], "code": coach["code"]} if coach else None,
                 "profile": {k: user[k] for k in ("sex", "birth_year", "height_cm", "weight_kg", "activity")},
                 "targets": {"kcal": kcal, "protein": protein, "set_by_pro": bool(user["kcal_target"])}}
+        # Уведомления в Telegram (nutrivia/notify.py): available — бот подключён на сервере
+        linked = await self.db.fetchone("SELECT 1 FROM tg_links WHERE user_id = ?", (user_id,))
+        view["telegram"] = {"available": self.telegram_ready, "linked": bool(linked)}
         if user["role"] == "operator":
             n = await self.db.fetchone("SELECT COUNT(*) AS n FROM users WHERE channel = 'app' AND role = 'client'"
                                        " AND coach_code IS NULL")

@@ -106,6 +106,8 @@ export type Me = {
   profile?: { sex: 'f' | 'm' | null; birth_year: number | null; height_cm: number | null; weight_kg: number | null; activity: Activity | null };
   /** set_by_pro — ориентир задал нутрициолог, параметры его не меняют */
   targets?: { kcal: number; protein: number; set_by_pro: boolean };
+  /** Уведомления в Telegram: available — бот подключён на сервере, linked — человек привязал свой чат */
+  telegram?: { available: boolean; linked: boolean };
 };
 
 export type Student = {
@@ -248,6 +250,9 @@ export const getMe = () => request<Me>('/v1/me');
 export const patchGoal = (goal: Goal) =>
   request<Me>('/v1/me', { method: 'PATCH', ...json({ goal: goal === 'coach' ? 'coach_plan' : goal }) });
 
+/** Ссылка t.me/<бот>?start=app_… — живёт 15 минут, одноразовая. */
+export const telegramLink = () => request<{ url: string }>('/v1/me/telegram', { method: 'POST' });
+export const telegramUnlink = () => request<Me>('/v1/me/telegram', { method: 'DELETE' });
 export const patchLang = (lang: Lang) => request<Me>('/v1/me', { method: 'PATCH', ...json({ lang }) });
 
 /** Параметры для личной нормы калорий. */

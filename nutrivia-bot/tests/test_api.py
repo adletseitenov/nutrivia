@@ -801,3 +801,11 @@ def test_huge_upload_rejected_before_reading(client):
     h = register(client)
     r = client.post("/v1/meals", headers={**h, "content-length": str(50 * 1024 * 1024)}, content=b"x")
     assert r.status_code == 413 and r.json()["code"] == "too_large"
+
+
+def test_telegram_link_needs_bot(client):
+    h, body = login(client)
+    assert body["me"]["telegram"] == {"available": False, "linked": False}
+    r = client.post("/v1/me/telegram", headers=h)
+    assert r.status_code == 503 and r.json()["code"] == "no_bot"
+    assert client.delete("/v1/me/telegram", headers=h).json()["telegram"]["linked"] is False

@@ -11,9 +11,10 @@ from aiogram.filters import Command, CommandObject, CommandStart
 from aiogram.types import (BufferedInputFile, CallbackQuery, ForceReply, InlineKeyboardButton,
                            InlineKeyboardMarkup, Message)
 
-from .config import ALMATY, Config, load_config
+from .config import ALMATY, Config, load_config, public_url
 from .db import Database
 from .engine import DishBase
+from .notify import LINK_PREFIX, consume_link, review_done
 from .service import Service
 from .texts import GOALS, HOME_PRODUCTS, lang_of, t
 from .vision import make_vision
@@ -57,6 +58,24 @@ async def send_review_card(bot: Bot, svc: Service, chat_id: int, meal_id: int, i
     await svc.set_review_message(meal_id, chat_id, msg.message_id)
 
 
+def telegram_sender(bot: Bot, app_url: str = ""):
+    """send(chat_id, text, path) для notify.py. Кнопка «Открыть» — только при https-адресе приложения
+    (Telegram не принимает http и localhost). False — не доставлено (человек заблокировал бота)."""
+    async def send(chat_id: int, text: str, path: str | None) -> bool:
+        markup = None
+        base = app_url or public_url()
+        if path and base.startswith("https://"):
+            markup = InlineKeyboardMarkup(inline_keyboard=[[InlineKeyboardButton(text="Открыть Nutrivia",
+                                                                                 url=base + path)]])
+        try:
+            await bot.send_message(chat_id, text, reply_markup=markup)
+            return True
+        except (TelegramForbiddenError, TelegramBadRequest) as e:
+            log.warning("telegram send to %s failed: %s", chat_id, e)
+            return False
+    return send
+
+
 def build(cfg: Config, svc: Service) -> tuple[Router, Router]:
     private = Router(name="private")
     private.message.filter(F.chat.type == "private")
@@ -80,6 +99,13 @@ def build(cfg: Config, svc: Service) -> tuple[Router, Router]:
     # ---------- личка клиента ----------
     @private.message(CommandStart())
     async def start(msg: Message, command: CommandObject):
+        if (command.args or "").startswith(LINK_PREFIX):  # привязка из профиля приложения
+            uid = await consume_link(svc.db, command.args, msg.chat.id)
+            await msg.answer(
+                "Готово! Сюда будут приходить уведомления Nutrivia: проверенные разборы, совет на вечер "
+                "и напоминания о серии. Отключить — в профиле приложения." if uid else
+                "Ссылка устарела. Откройте профиль в приложении и нажмите «Подключить Telegram» ещё раз.")
+            return
         lang = lang_of(msg.from_user.language_code)
         user, coach = await svc.register(msg.from_user.id, lang, command.args)
         lang = user["lang"]
@@ -300,8 +326,8 @@ def build(cfg: Config, svc: Service) -> tuple[Router, Router]:
         user = await svc.db.get_user(client_id)
         if client_id < 0:  # WhatsApp-клиент: нутрициолог копирует текст сам
             await cb.message.reply(f"Скопируйте клиенту:\n\n{text}")
-        elif user["channel"] == "app":  # приложение само заберёт статус «проверено»
-            pass
+        elif user["channel"] == "app":  # статус «проверено» приложение заберёт само; привязал Telegram — напишем
+            await review_done(svc, meal_id, telegram_sender(bot))
         else:
             try:
                 await bot.send_message(client_id, text, reply_markup=client_reply_kb(meal_id, user["lang"]))

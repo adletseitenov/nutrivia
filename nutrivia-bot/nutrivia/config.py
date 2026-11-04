@@ -65,3 +65,11 @@ def load_config() -> Config:
         kaspi_pay_url=env.get("KASPI_PAY_URL", ""),
         offer_price_kzt=int(env.get("OFFER_PRICE_KZT", "2000")),
     )
+
+
+def public_url() -> str:
+    """Адрес приложения для ссылок наружу (Telegram, коды входа). Railway сам задаёт RAILWAY_PUBLIC_DOMAIN."""
+    if os.environ.get("PUBLIC_URL"):
+        return os.environ["PUBLIC_URL"].rstrip("/")
+    domain = os.environ.get("RAILWAY_PUBLIC_DOMAIN", "")
+    return f"https://{domain}" if domain else ""
