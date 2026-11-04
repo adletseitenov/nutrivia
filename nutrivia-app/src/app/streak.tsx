@@ -54,7 +54,7 @@ export default function Streak() {
         </Txt>
         <Txt variant="caption" tone="muted" center style={{ fontSize: 14 }}>
           {s.next_stage_in !== null
-            ? `Ещё ${s.next_stage_in} ${daysWord(s.next_stage_in)} подряд — и маскот вырастет до стадии ${s.stage + 1}`
+            ? `Ещё ${s.next_stage_in} ${daysWord(s.next_stage_in)} подряд — и откроется стадия ${s.stage + 1}`
             : 'Маскот вырос полностью'}
         </Txt>
         <Txt variant="caption" tone={s.today_counted ? 'accent' : 'muted'} center>
@@ -116,7 +116,7 @@ export default function Streak() {
       </View>
 
       <Txt variant="caption" tone="muted" center>
-        День засчитывается, если есть хотя бы {s.min_photos} фото еды. Пропустили день — маскот опустится на одну стадию, а не в ноль.
+        День засчитывается, если есть хотя бы {s.min_photos} фото еды. Пропустили день — стадия опустится на одну, а не в ноль.
         {s.best > s.days ? ` Лучшая серия: ${s.best} ${daysWord(s.best)}.` : ''}
       </Txt>
     </Screen>

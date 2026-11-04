@@ -3,6 +3,7 @@ import { useCallback, useState } from 'react';
 import { Pressable, StyleSheet, View } from 'react-native';
 
 import { getToday, type ServerToday } from '@/api/client';
+import { AdviceCard } from '@/components/advice-card';
 import { Button } from '@/components/button';
 import { MascotSlot } from '@/components/mascot-slot';
 import { MealCard } from '@/components/meal-card';
@@ -59,9 +60,7 @@ export default function Today() {
           accessibilityLabel={streak ? `Серия: ${streak.days} ${daysWord(streak.days)} подряд` : 'Серия'}
           onPress={() => router.push('/streak')}
           style={[styles.streak, { backgroundColor: c.surface }]}>
-          <View style={[styles.streakMascot, { backgroundColor: c.accentTint, borderColor: c.accent }]}>
-            <Txt style={{ fontFamily: font.bold, fontSize: 10, color: c.accentText }}>ст.{streak?.stage ?? 1}</Txt>
-          </View>
+          <MascotSlot stage={streak?.stage ?? 1} size={36} />
           <View>
             <Txt style={{ fontFamily: font.extrabold, fontSize: 17, lineHeight: 20 }}>{streak?.days ?? '—'}</Txt>
             <Txt style={{ fontFamily: font.medium, fontSize: 11, lineHeight: 14, color: c.muted }}>{daysWord(streak?.days ?? 0)}</Txt>
@@ -126,6 +125,9 @@ export default function Today() {
             <Button title={t('Сфотографировать')} variant="accent" onPress={() => router.push('/camera')} />
           </View>
         )}
+        {!picked && meals.length > 0 && state.advice && (
+          <AdviceCard key={meals.length} advice={state.advice} onAdded={() => refreshToday(dispatch)} />
+        )}
         {meals.map((m) => {
           const n = mealNutrients(m.items);
           return (
@@ -152,7 +154,6 @@ export default function Today() {
 const styles = StyleSheet.create({
   head: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' },
   streak: { flexDirection: 'row', alignItems: 'center', gap: space[2], borderRadius: radius.full, paddingLeft: 4, paddingRight: 14, paddingVertical: 4 },
-  streakMascot: { width: 36, height: 36, borderRadius: 18, borderWidth: 1.5, borderStyle: 'dashed', alignItems: 'center', justifyContent: 'center' },
   week: { flexDirection: 'row', gap: 6 },
   day: { flex: 1, alignItems: 'center', gap: 2, paddingVertical: space[2], borderRadius: 16 },
   dayDot: { width: 5, height: 5, borderRadius: 3 },

@@ -1,31 +1,43 @@
 import { Image, type ImageSource } from 'expo-image';
-import { StyleSheet, View } from 'react-native';
+import { View } from 'react-native';
+import Svg, { Circle } from 'react-native-svg';
 
 import { useColors } from '@/theme/use-colors';
-import { t } from '@/lib/i18n';
-
-import { Txt } from './txt';
 
 /**
  * Слот под маскота «Голубику» (рисует художник). Растёт по стадиям 1–5 от серии дней и заданий.
  * Когда придут файлы, положите их в assets/mascot/stage-N.png и пропишите здесь:
  *   1: require('@/assets/mascot/stage-1.png'), … — раскладка экранов не изменится.
+ * Без стадии или без файла — нейтральный знак бренда: кольцо, заполненное на stage/5.
  */
-export const MASCOT_STAGES: Partial<Record<number, ImageSource>> = {};
+export const MASCOT_STAGES: Partial<Record<number, ImageSource>> = {
+  1: require('@/assets/mascot/stage-1.png'), // бутон
+  2: require('@/assets/mascot/stage-2.png'), // белый бутон
+  3: require('@/assets/mascot/stage-3.png'), // цветок
+  4: require('@/assets/mascot/stage-4.png'), // розовая завязь
+  5: require('@/assets/mascot/stage-5.png'), // голубика
+};
+
+const STAGES = 5;
 
 export function MascotSlot({ stage, size = 120 }: { stage?: number; size?: number }) {
   const c = useColors();
   const src = stage ? MASCOT_STAGES[stage] : undefined;
-  if (src) return <Image source={src} style={{ width: size, height: size }} contentFit="contain" accessibilityLabel={`Маскот, стадия ${stage}`} />;
+  const label = stage ? `Голубика, стадия ${stage} из ${STAGES}` : 'Nutrivia';
+  if (src) return <Image source={src} style={{ width: size, height: size }} contentFit="contain" accessibilityLabel={label} />;
+
+  const stroke = Math.max(3, size * 0.09);
+  const r = (size - stroke) / 2 - size * 0.06;
+  const len = 2 * Math.PI * r;
+  const frac = Math.min(1, Math.max(0.12, (stage ?? 1) / STAGES));
   return (
-    <View
-      accessibilityLabel={t('Место для маскота')}
-      style={[styles.empty, { width: size, height: size, borderRadius: size / 2, backgroundColor: c.accentTint, borderColor: c.accent }]}>
-      <Txt variant="caption" tone="accent" center>{stage ? `Голубика\nстадия ${stage}` : 'Голубика'}</Txt>
+    <View accessible accessibilityLabel={label} style={{ width: size, height: size, borderRadius: size / 2, backgroundColor: c.accentTint }}>
+      <Svg width={size} height={size} style={{ transform: [{ rotate: '-90deg' }] }}>
+        <Circle cx={size / 2} cy={size / 2} r={r} stroke={c.track} strokeWidth={stroke} fill="none" />
+        <Circle cx={size / 2} cy={size / 2} r={r} stroke={c.accent} strokeWidth={stroke} fill="none"
+          strokeLinecap="round" strokeDasharray={len} strokeDashoffset={len * (1 - frac)} />
+        <Circle cx={size / 2} cy={size / 2} r={size * 0.11} fill={c.accent} />
+      </Svg>
     </View>
   );
 }
-
-const styles = StyleSheet.create({
-  empty: { borderWidth: 1.5, borderStyle: 'dashed', alignItems: 'center', justifyContent: 'center' },
-});

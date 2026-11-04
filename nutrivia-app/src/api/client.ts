@@ -60,6 +60,14 @@ export type ServerToday = {
   meals: ServerMeal[];
   totals: { kcal: number; protein: number; fat: number; carbs: number };
   targets: { kcal: number; protein: number };
+  /** «Совет на вечер»: блюда из базы под остаток дня (сервер, Engine) */
+  advice?: Advice;
+};
+
+export type Advice = {
+  remaining_kcal: number;
+  hint: 'protein' | 'light' | null;
+  options: { dish_id: string; name: string; grams: number; kcal: number; protein: number }[];
 };
 
 export type ServerProgress = {

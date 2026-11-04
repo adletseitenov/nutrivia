@@ -256,6 +256,10 @@ def test_photo_flow(client):
     today = client.get("/v1/today", headers=h).json()
     assert len(today["meals"]) == 1 and round(today["totals"]["kcal"]) == 895
     assert today["targets"]["kcal"] == 1600
+    # совет на вечер: остаток 705 ккал, белка мало → белковые блюда из базы, каждое влезает в остаток
+    adv = today["advice"]
+    assert adv["remaining_kcal"] == 705 and adv["hint"] == "protein"
+    assert 1 <= len(adv["options"]) <= 3 and all(o["kcal"] <= 705 for o in adv["options"])
 
 
 def test_reject_non_images_and_unknown_dish(client):

@@ -6,7 +6,7 @@ import { createContext, useContext, useEffect, useMemo, useReducer, useRef, type
 
 import {
   ApiError, getMe, getProgress, getToday, hasSession, setUnauthorizedHandler,
-  type Me, type Role, type ServerItem, type ServerMeal, type ServerProgress, type ServerToday,
+  type Advice, type Me, type Role, type ServerItem, type ServerMeal, type ServerProgress, type ServerToday,
 } from '@/api/client';
 
 import { add, compute, getDish, ZERO, type Nutrients } from '@/engine/engine';
@@ -75,6 +75,7 @@ type State = {
   me: Me | null;
   meals: Meal[];
   serverTargets: { kcal: number; protein: number } | null;
+  advice: Advice | null;
   progress: ServerProgress | null;
   adviceDone: boolean;
 };
@@ -102,6 +103,7 @@ const initial: State = {
   me: null,
   meals: [],
   serverTargets: null,
+  advice: null,
   progress: null,
   adviceDone: false,
 };
@@ -119,7 +121,7 @@ function reducer(state: State, a: Action): State {
     case 'updateMeal':
       return { ...state, meals: state.meals.map((m) => (m.id === a.id ? { ...m, ...a.patch } : m)) };
     case 'setToday':
-      return { ...state, loaded: true, meals: a.today.meals.map(mealFromServer), serverTargets: a.today.targets };
+      return { ...state, loaded: true, meals: a.today.meals.map(mealFromServer), serverTargets: a.today.targets, advice: a.today.advice ?? null };
     case 'setSignup':
       return { ...state, signup: { ...state.signup, ...a.patch } };
     case 'setMe': {

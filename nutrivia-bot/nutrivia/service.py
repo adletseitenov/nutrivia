@@ -12,7 +12,7 @@ from .advice import advice_text, weekly_text
 from .config import ALMATY, Config
 from .db import Database, local_day_bounds
 from .drafts import apply_edits, build_items, format_client, format_review, make_item
-from .engine import DishBase
+from .engine import DishBase, compute
 from .matcher import Matcher, parse_edits
 from .texts import GOALS, HEALTH_WORDS, HOME_PRODUCTS
 from .vision import VisionProvider, VisionResult, parse_payload
@@ -674,10 +674,20 @@ class Service:
                 for k in tot:
                     tot[k] += i[k] or 0
         user = await self.db.get_user(user_id)
-        from .advice import targets_for
+        from .advice import pick_options, targets_for
         kcal_target, protein_target = targets_for(user)
+        # «Совет на вечер»: 1–3 блюда из базы под остаток дня. Считает Engine, не модель.
+        remaining = kcal_target - tot["kcal"]
+        protein_low = bool(meals) and tot["protein"] < protein_target * 0.7
+        advice = []
+        for d, grams in pick_options(self.base, remaining, protein_low):
+            n = compute(d, grams)
+            advice.append({"dish_id": d.id, "name": d.name(user["lang"]), "grams": grams,
+                           "kcal": round(n.kcal), "protein": round(n.protein, 1)})
+        hint = "protein" if protein_low else "light" if meals and remaining < 400 else None
         return {"meals": meals, "totals": {k: round(v, 1) for k, v in tot.items()},
-                "targets": {"kcal": kcal_target, "protein": protein_target}}
+                "targets": {"kcal": kcal_target, "protein": protein_target},
+                "advice": {"remaining_kcal": round(remaining), "hint": hint, "options": advice}}
 
     # --- серия и неделя (приложение) ---
     STAGE_DAYS = (0, 3, 7, 14, 30)  # пороги стадий маскота, черновик — утверждает фаундер
