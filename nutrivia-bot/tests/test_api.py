@@ -369,7 +369,7 @@ def test_pro_sees_only_own_students(client):
 def test_pro_cannot_send_unmatched(client):
     pro_h, body = login(client, role="nutritionist", name="Динара")
     client.app.state.svc.vision.payload = {"is_food": True, "dishes": [
-        {"name": "суши", "portion": 6, "unit": "штука", "grams": 180, "confidence": 0.6}]}
+        {"name": "фуа-гра", "portion": 6, "unit": "штука", "grams": 180, "confidence": 0.6}]}
     student_h, _ = login(client, phone="+77010000001", invite_code=body["me"]["pro"]["invite_code"])
     meal = upload(client, student_h).json()
     r = client.post(f"/v1/pro/meals/{meal['id']}/send", headers=pro_h)

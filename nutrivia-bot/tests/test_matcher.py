@@ -12,7 +12,7 @@ def test_exact_synonym_fuzzy(matcher):
 
 
 def test_unknown_dish(matcher):
-    assert matcher.match("суши филадельфия") is None
+    assert matcher.match("фуа-гра с инжиром") is None
     assert matcher.match("") is None
 
 
@@ -37,10 +37,14 @@ def test_long_model_names(matcher):
         "жареный картофель": "potato_fried",
         "отварной рис": "rice_boiled",
         "яичница": "omelet",
+        "авокадо ломтиками": "avocado",
+        "казы": "kazy",
+        "шаурма с курицей": "doner",
+        "картофельное пюре": "mashed_potato",
     }
     for name, dish_id in cases.items():
         m = matcher.match(name)
         assert m is not None and m.dish.id == dish_id, (name, m)
     # Раньше нечёткий поиск по куску строки давал «чай с молоком» и «лепёшку»
-    for name in ("зелень с чёрным перцем и острым маслом", "авокадо ломтиками", "клубника", "сумаляк"):
+    for name in ("зелень с чёрным перцем и острым маслом", "сумаляк", "фалафель в пите"):
         assert matcher.match(name) is None, name

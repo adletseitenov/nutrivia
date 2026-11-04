@@ -101,11 +101,11 @@ async def test_not_food_and_vision_error(svc):
 async def test_unknown_dish_flagged(svc):
     await onboard(svc)
     svc.vision = FakeVision({"is_food": True, "dishes": [
-        {"name": "суши филадельфия", "portion": 6, "unit": "штука", "grams": 180, "confidence": 0.6}]})
+        {"name": "фуа-гра с инжиром", "portion": 6, "unit": "штука", "grams": 180, "confidence": 0.6}]})
     out = await svc.receive_photo(1, b"img", ts=NOON)
     assert "НЕТ В БАЗЕ" in out.review_text
     m = await compute_metrics(svc.db)
-    assert m["missing_dishes"] == [("суши филадельфия", 1)]
+    assert m["missing_dishes"] == [("фуа-гра с инжиром", 1)]
 
 
 async def test_delete_removes_everything(svc, tmp_path):
