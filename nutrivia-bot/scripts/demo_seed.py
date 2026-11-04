@@ -21,7 +21,7 @@ from nutrivia.engine import DishBase
 from nutrivia.service import Service
 from nutrivia.vision import FakeVision
 
-CLIENT = os.environ.get("DEMO_CLIENT", "+77087433677")   # Алан
+CLIENT = os.environ.get("DEMO_CLIENT", "+77000000001")   # настоящий номер — только в переменной DEMO_CLIENT, не в коде
 TRAINER = os.environ.get("DEMO_TRAINER", "+77000000002")
 OPERATOR = os.environ.get("DEMO_OPERATOR", "+77000000003")
 STUDENTS = ["+77000000011", "+77000000012"]
