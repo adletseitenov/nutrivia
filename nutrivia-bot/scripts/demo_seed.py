@@ -25,7 +25,7 @@ CLIENT = os.environ.get("DEMO_CLIENT", "+77087433677")   # Алан
 TRAINER = os.environ.get("DEMO_TRAINER", "+77000000002")
 OPERATOR = os.environ.get("DEMO_OPERATOR", "+77000000003")
 STUDENTS = ["+77000000011", "+77000000012"]
-PHOTO = Path(__file__).resolve().parents[2] / "nutrivia-app/assets/images/demo-plov.png"
+PHOTO = Path(os.environ.get("DEMO_PHOTO") or Path(__file__).resolve().parents[2] / "nutrivia-app/assets/images/demo-plov.png")
 
 # Неделя клиента: (час, минута, блюда после проверки, комментарий тренера)
 DAYS = [

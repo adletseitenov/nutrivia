@@ -248,7 +248,7 @@ class OpenRouterVision:
     """Тот же промпт и схема через OpenRouter: одна оплата, любая модель с картинками.
     Стоимость берём из usage.cost — OpenRouter считает её сам по цене выбранной модели."""
 
-    def __init__(self, model: str, api_key: str, client: httpx.AsyncClient | None = None, timeout: float = 60,
+    def __init__(self, model: str, api_key: str, client: httpx.AsyncClient | None = None, timeout: float = 30,
                  fallback_model: str = ""):
         self.model, self.api_key, self.fallback_model = model, api_key, fallback_model
         self.client = client or httpx.AsyncClient(timeout=timeout)

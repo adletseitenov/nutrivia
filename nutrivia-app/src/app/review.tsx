@@ -47,6 +47,7 @@ export default function Review() {
         if (meal.status === 'not_food') return setPhase({ kind: 'not_food' });
         setItems(itemsFromServer(meal.items));
         setPhase({ kind: 'ready', meal });
+        if (!meal.items.some((i) => i.dish_id)) setAdding(true);
       },
       (e) => {
         if (alive) setPhase({ kind: 'error', message: e instanceof ApiError ? e.message : 'Что-то пошло не так. Попробуйте ещё раз.' });
@@ -63,6 +64,8 @@ export default function Review() {
   }
 
   const total = useMemo(() => mealNutrients(items), [items]);
+  // Разбор пустой: модель не ответила, дневной потолок трат или блюд нет в базе — человек выбирает сам
+  const manualNeeded = phase.kind === 'ready' && !items.some((it) => it.dishId);
   const now = new Date();
   const time = `${String(now.getHours()).padStart(2, '0')}:${String(now.getMinutes()).padStart(2, '0')}`;
 
@@ -129,6 +132,9 @@ export default function Review() {
               <Button title={t('Закрыть')} variant="secondary" onPress={() => router.back()} />
               <Button title={t('Повторить')} onPress={analyze} />
             </View>
+            <Pressable accessibilityRole="button" onPress={() => router.replace('/manual')} hitSlop={8}>
+              <Txt variant="headline" style={{ fontSize: 15, color: c.accentText }}>{t('Записать без фото')}</Txt>
+            </Pressable>
           </View>
         )}
 
@@ -161,6 +167,14 @@ export default function Review() {
                   )}
                 </View>
               </View>
+
+              {manualNeeded && (
+                <View style={[styles.note, { backgroundColor: c.surface }]}>
+                  <Txt variant="caption" style={{ flex: 1, fontSize: 14, lineHeight: 20 }}>
+                    {t('Автоматически распознать не получилось. Выберите блюда из базы — посчитаем сами, а нутрициолог проверит по фото.')}
+                  </Txt>
+                </View>
+              )}
 
               <View style={{ gap: space[2] }}>
                 {items.map((it, i) => {
@@ -214,7 +228,7 @@ export default function Review() {
             </ScrollView>
             <View style={[styles.actions, { paddingBottom: insets.bottom + space[3] }]}>
               <Button title={t('Переснять')} variant="secondary" style={{ flex: 1 }} onPress={() => router.replace('/camera')} />
-              <Button title={saving ? 'Сохраняем…' : 'Верно'} variant="accent" style={{ flex: 1 }} disabled={saving} onPress={confirm} />
+              <Button title={saving ? 'Сохраняем…' : 'Верно'} variant="accent" style={{ flex: 1 }} disabled={saving || manualNeeded} onPress={confirm} />
             </View>
           </>
         )}

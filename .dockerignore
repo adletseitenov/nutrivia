@@ -1,0 +1,16 @@
+**/node_modules
+**/.env
+**/*.db
+**/*.db-*
+**/.venv
+**/__pycache__
+nutrivia-app/dist
+nutrivia-app/.expo
+nutrivia-bot/data/*photos*
+nutrivia-bot/data/pilot-logs
+nutrivia-bot/data/backups
+nutrivia-bot/exports
+e2e
+.git
+.claude
+nutrivia-build-plan.md
