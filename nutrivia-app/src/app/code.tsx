@@ -62,7 +62,8 @@ export default function Code() {
       router.dismissAll();
       router.replace(me.pro ? '/pro' : '/today');
       if (r.join_message) {
-        const title = r.join === 'pro_account' ? 'Это кабинет специалиста' : 'Код не подошёл';
+        const title = r.join === 'pro_account' ? 'Этот номер — кабинет специалиста'
+          : r.join === 'client_account' ? 'Этот номер — аккаунт клиента' : 'Код не подошёл';
         if (Platform.OS === 'web') window.alert(`${title}\n${r.join_message}`);
         else Alert.alert(title, r.join_message);
       }

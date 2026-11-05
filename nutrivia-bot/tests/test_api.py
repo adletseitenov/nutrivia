@@ -827,6 +827,13 @@ def test_second_login_with_coach_code(manual_client):
     again = c.post("/v1/auth/sms/verify", json={**base, "phone": trainer_phone, "code": issue(c, trainer_phone),
                                                 "role": "client", "invite_code": invite}).json()
     assert again["me"]["role"] == "trainer" and again["join"] == "pro_account" and "другой номер" in again["join_message"]
+    # прошёл регистрацию клиента без кода (цель, параметры) — тоже объясняем
+    plain = c.post("/v1/auth/sms/verify", json={**base, "phone": trainer_phone, "code": issue(c, trainer_phone)}).json()
+    assert plain["join"] == "pro_account"
+    # обычный «Войти» (без цели и кода) — молча открываем кабинет
+    login = c.post("/v1/auth/sms/verify", json={"phone": trainer_phone, "code": issue(c, trainer_phone),
+                                                "consent": True}).json()
+    assert login["join"] is None and login["me"]["role"] == "trainer"
     # клиент без тренера при повторном входе с кодом — подключается
     first = c.post("/v1/auth/sms/verify", json={**base, "phone": client_phone, "code": issue(c, client_phone)}).json()
     assert first["me"]["coach"] is None
