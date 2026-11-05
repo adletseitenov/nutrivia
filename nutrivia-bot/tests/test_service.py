@@ -132,6 +132,7 @@ async def test_delete_removes_everything(svc, tmp_path):
 
 
 async def test_advice_weekly_offer(svc):
+    svc.db.clock = lambda: NOON  # день участия считается от joined_at — не от реальной даты запуска тестов
     await onboard(svc)
     out = await svc.receive_photo(1, b"img", ts=NOON)
     await svc.reviewer_send(out.meal_id, 99)

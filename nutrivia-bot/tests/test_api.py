@@ -473,8 +473,9 @@ def test_profile_sets_personal_targets(client):
     assert client.get("/v1/today", headers=h).json()["targets"]["kcal"] == me["targets"]["kcal"]
     # цель можно менять отдельно, параметры остаются
     assert client.patch("/v1/me", headers=h, json={"goal": "even"}).json()["profile"]["sex"] == "f"
-    r = client.patch("/v1/me", headers=h, json={"birth_year": 2015})
-    assert r.status_code == 400 and r.json()["code"] == "under_18"
+    assert client.patch("/v1/me", headers=h, json={"birth_year": 2012}).status_code == 200   # без ограничения 18+
+    r = client.patch("/v1/me", headers=h, json={"birth_year": 2025})
+    assert r.status_code == 400 and r.json()["code"] == "bad_year"
     assert client.patch("/v1/me", headers=h, json={"height_cm": 20}).status_code == 422
 
 

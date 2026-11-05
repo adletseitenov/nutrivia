@@ -324,8 +324,8 @@ def create_app(cfg: Config | None = None, vision: VisionProvider | None = None, 
         fields = body.model_dump(exclude_none=True)
         if "birth_year" in fields:
             year = datetime.fromtimestamp(svc.db.clock(), ALMATY).year
-            if year - fields["birth_year"] < 18:
-                raise AuthError("under_18", "Nutrivia — только для взрослых, от 18 лет.", 400)
+            if year - fields["birth_year"] < 5:  # возраст не ограничиваем — только явная опечатка в годе
+                raise AuthError("bad_year", "Проверьте год рождения.", 400)
         if fields:
             await svc.db.update_user(user["tg_id"], **fields)
         return await svc.me_view(user["tg_id"])

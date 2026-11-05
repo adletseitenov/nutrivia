@@ -36,7 +36,7 @@ export default function BodyScreen() {
 
   const y = Number(year), h = Number(height), w = Number(weight.replace(',', '.'));
   const problems = {
-    year: year.length === 4 && (YEAR - y < 18 ? 'Nutrivia — только для взрослых, от 18 лет.' : y < 1920 ? 'Проверьте год.' : null),
+    year: year.length === 4 && (YEAR - y < 5 || y < 1920 ? 'Проверьте год.' : null),
     height: height.length >= 3 && (h < 120 || h > 230) ? 'Рост в сантиметрах, от 120 до 230.' : null,
     weight: weight.length >= 2 && (w < 35 || w > 300) ? 'Вес в килограммах, от 35 до 300.' : null,
   };
