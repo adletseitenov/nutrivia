@@ -35,11 +35,13 @@ async def compute_metrics(db: Database) -> dict:
             if consented else None
     active_days = Counter(len(d) for d in photo_days.values())
 
-    review_seconds = [e["data"]["review_seconds"] for e in by_name["review_done"]]
+    # У удалённых аккаунтов data события стёрта (NULL) — такие события в средних не участвуют
+    review_seconds = [e["data"]["review_seconds"] for e in by_name["review_done"] if "review_seconds" in e["data"]]
     reviewer_by_group = defaultdict(list)
     for e in by_name["review_done"]:
         grp = joined.get(e["user_id"], {}).get("data", {}).get("group", "?")
-        reviewer_by_group[grp].append(e["data"]["review_seconds"])
+        if "review_seconds" in e["data"]:
+            reviewer_by_group[grp].append(e["data"]["review_seconds"])
 
     # Ошибка граммов модели против человека по блюдам
     gram_err = defaultdict(list)
@@ -69,7 +71,7 @@ async def compute_metrics(db: Database) -> dict:
             "median_review_seconds": _median(review_seconds),
             "median_review_seconds_coach": _median(reviewer_by_group["coach"]),
             "median_review_seconds_solo": _median(reviewer_by_group["solo"]),
-            "median_total_latency_s": _median([e["data"]["total_latency"] for e in by_name["reply_sent"]]),
+            "median_total_latency_s": _median([e["data"]["total_latency"] for e in by_name["reply_sent"] if "total_latency" in e["data"]]),
             "users_7plus_photo_days": sum(v for k, v in active_days.items() if k >= 7),
             **{f"retention_{k}": v for k, v in retention.items()},
             "advice_sent": len(by_name["advice_sent"]),

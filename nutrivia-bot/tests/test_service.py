@@ -155,3 +155,14 @@ async def test_health_words():
     from nutrivia.service import Service
     assert Service.is_health_complaint("после еды болит живот")
     assert not Service.is_health_complaint("плов 200")
+
+
+async def test_metrics_survive_deleted_users(svc):
+    """Удаление аккаунта стирает data событий — метрики и сводка админки не должны падать."""
+    await onboard(svc)
+    out = await svc.receive_photo(1, b"img", ts=NOON)
+    await svc.reviewer_send(out.meal_id, 99)
+    await svc.delete_user(1)
+    m = await compute_metrics(svc.db)
+    assert m["summary"]["median_review_seconds"] is None
+    assert (await svc.admin_overview())["metrics_error"] is None
