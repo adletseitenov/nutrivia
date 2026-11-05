@@ -649,7 +649,8 @@ def test_fridge_ideas_fit_remaining_kcal(client):
     assert small["remaining_kcal"] < out["remaining_kcal"] and any(i["smaller"] for i in small["ideas"])
     # убрал курицу, дописал рыбу и картошку — без ИИ
     edited = client.post("/v1/fridge/ideas", headers=h, json={"products": ["рыба", "картофель", "творог", "кефир"]}).json()
-    assert {i["title"] for i in edited["ideas"]} == {"Рыба с картофелем", "Творог с кефиром"}
+    assert [i["title"] for i in edited["ideas"]][:2] in (["Рыба с картофелем", "Творог с кефиром"],
+                                                         ["Творог с кефиром", "Рыба с картофелем"])
 
 
 def test_same_photo_twice_is_not_paid_again(client):

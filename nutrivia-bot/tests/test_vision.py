@@ -129,3 +129,15 @@ def test_fridge_product_keys():
     from nutrivia.fridge import product_keys
     assert product_keys(["яйцо", "куриное филе", "гречневая крупа", "помидоры черри"]) == {"egg", "chicken", "buckwheat", "tomato"}
     assert product_keys(["кетчуп"]) == set()
+    # реальные названия от модели: «куриные» яйца — не курица, «греческий» йогурт — не гречка
+    assert product_keys(["яйца куриные", "греческий йогурт", "молоко 3,2%"]) == {"egg", "yogurt", "milk"}
+    assert product_keys(["сырники"]) == set()
+
+
+def test_fridge_finds_something_for_common_fridges(base):
+    """Йогурт, яйца, молоко — частый холодильник: раньше «нет готовых блюд», потому что блюда были только парами."""
+    from nutrivia.fridge import ideas_for
+    titles = [i["title"] for i in ideas_for(["йогурт", "яйца", "молоко"], base, 1400, False)]
+    assert titles[0] == "Омлет на молоке" and "Йогурт" in titles
+    # продукт из пары не повторяется отдельным блюдом
+    assert "Яичница" not in titles and "Стакан молока" not in titles
