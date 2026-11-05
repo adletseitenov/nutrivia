@@ -279,6 +279,8 @@ def create_app(cfg: Config | None = None, vision: VisionProvider | None = None, 
         "not_found": "Такого кода нет. Проверьте его у тренера или нутрициолога.",
         "full": "У этого тренера уже максимум учеников.",
         "not_client": "Код вводят только клиенты.",
+        "pro_account": "Этот номер уже зарегистрирован как кабинет специалиста — он и откроется. "
+                       "Чтобы зайти как клиент, нужен другой номер.",
     }
 
     @app.post("/v1/auth/sms/start")
@@ -307,6 +309,14 @@ def create_app(cfg: Config | None = None, vision: VisionProvider | None = None, 
                 if not body.invite_code and join != "ok":
                     log.warning("DEFAULT_INVITE_CODE %s: %s", code, join)
                     join = None
+        elif body.invite_code:
+            # Повторный вход: роль не меняется. Клиент без тренера подключается по коду, специалисту — объясняем
+            existing = await svc.db.get_user(uid)
+            if existing["role"] == "client":
+                if not existing["coach_code"]:
+                    join = await svc.join_coach(uid, body.invite_code)
+            else:
+                join = "pro_account"
         token = await auth.issue(uid)
         return {"token": token, "is_new": is_new, "join": join, "join_message": JOIN_MESSAGES.get(join),
                 "me": await svc.me_view(uid)}

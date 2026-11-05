@@ -62,8 +62,9 @@ export default function Code() {
       router.dismissAll();
       router.replace(me.pro ? '/pro' : '/today');
       if (r.join_message) {
-        if (Platform.OS === 'web') window.alert(`Код не подошёл\n${r.join_message}`);
-        else Alert.alert('Код не подошёл', r.join_message);
+        const title = r.join === 'pro_account' ? 'Это кабинет специалиста' : 'Код не подошёл';
+        if (Platform.OS === 'web') window.alert(`${title}\n${r.join_message}`);
+        else Alert.alert(title, r.join_message);
       }
     } catch (e) {
       Haptics.notificationAsync(Haptics.NotificationFeedbackType.Error);

@@ -813,3 +813,23 @@ def test_telegram_link_needs_bot(client):
     r = client.post("/v1/me/telegram", headers=h)
     assert r.status_code == 503 and r.json()["code"] == "no_bot"
     assert client.delete("/v1/me/telegram", headers=h).json()["telegram"]["linked"] is False
+
+
+def test_second_login_with_coach_code(manual_client):
+    """Номер уже зарегистрирован: роль не меняется. Специалисту — понятное сообщение, клиент без тренера — подключается."""
+    c = manual_client
+    trainer_phone, client_phone = "+77070000101", "+77070000102"
+    base = {"consent": True, "goal": "lose"}
+    t = c.post("/v1/auth/sms/verify", json={**base, "phone": trainer_phone, "code": issue(c, trainer_phone),
+                                            "role": "trainer", "name": "Айбек"}).json()
+    invite = t["me"]["pro"]["invite_code"]
+    # тренер входит снова и вводит свой же код как «клиент» — остаётся тренером, получает объяснение
+    again = c.post("/v1/auth/sms/verify", json={**base, "phone": trainer_phone, "code": issue(c, trainer_phone),
+                                                "role": "client", "invite_code": invite}).json()
+    assert again["me"]["role"] == "trainer" and again["join"] == "pro_account" and "другой номер" in again["join_message"]
+    # клиент без тренера при повторном входе с кодом — подключается
+    first = c.post("/v1/auth/sms/verify", json={**base, "phone": client_phone, "code": issue(c, client_phone)}).json()
+    assert first["me"]["coach"] is None
+    second = c.post("/v1/auth/sms/verify", json={**base, "phone": client_phone, "code": issue(c, client_phone),
+                                                 "invite_code": invite}).json()
+    assert second["join"] == "ok" and second["me"]["coach"]["code"] == invite
