@@ -1,0 +1,22 @@
+{
+  "name": "nutrivia-launch-video",
+  "private": true,
+  "scripts": {
+    "studio": "remotion studio src/index.ts",
+    "render": "remotion render src/index.ts Launch out/nutrivia-launch.mp4 --codec=h264 --audio-codec=aac --crf=18 --pixel-format=yuv420p",
+    "render:vertical": "remotion render src/index.ts LaunchVertical out/nutrivia-launch-9x16.mp4 --codec=h264 --audio-codec=aac --crf=18 --pixel-format=yuv420p",
+    "typecheck": "tsc --noEmit"
+  },
+  "dependencies": {
+    "@remotion/cli": "4.0.538",
+    "@remotion/fonts": "4.0.538",
+    "@remotion/media": "4.0.538",
+    "react": "19.1.0",
+    "react-dom": "19.1.0",
+    "remotion": "4.0.538"
+  },
+  "devDependencies": {
+    "@types/react": "19.1.8",
+    "typescript": "5.8.3"
+  }
+}

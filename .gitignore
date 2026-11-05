@@ -7,3 +7,11 @@
 nutrivia-build-plan.md
 screenshots/
 footage/
+
+# Лаунч-видео: медиа (стоки, музыка, рендеры) — не в репозиторий
+launch-video/public/media/
+launch-video/vo/*.mp3
+launch-video/vo/*.wav
+launch-video/out/
+launch-video/node_modules/
+nutrivia-bot/data/launch-photos/
