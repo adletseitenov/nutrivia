@@ -98,12 +98,19 @@ function show(app, err = '') {
 const fmt = (n) => n == null ? '—' : Number(n).toLocaleString('ru-RU');
 
 async function load() {
-  const [o, users, pays] = await Promise.all([api('/v1/admin/overview').then((r) => r.json()), api('/v1/admin/users').then((r) => r.json()),
-    api('/v1/admin/payments').then((r) => r.json())]);
+  // Сводка может упасть — админка всё равно открывается: выдать код входа важнее графиков
+  const [o, users, pays] = await Promise.all([
+    api('/v1/admin/overview').then((r) => (r.ok ? r.json() : null)).catch(() => null),
+    api('/v1/admin/users').then((r) => (r.ok ? r.json() : [])).catch(() => []),
+    api('/v1/admin/payments').then((r) => (r.ok ? r.json() : [])).catch(() => [])]);
   $('payments').innerHTML = pays.map((p) => `<tr><td>${esc(p.at)}</td><td>${p.user_id}</td><td>${esc(p.phone)}</td><td>${fmt(p.amount_kzt)} ₸</td>`
     + `<td><button data-pay="${p.id}" data-ok="1">Подтвердить</button> <button class="secondary" data-pay="${p.id}" data-ok="0">Отклонить</button></td></tr>`).join('')
     || '<tr><td colspan="5" class="muted">Заявок нет.</td></tr>';
   show(true);
+  $('users').innerHTML = users.map((u) => `<tr><td>${u.user_id}</td><td><span class="pill">${esc(ROLES[u.role] || u.role)}</span></td><td>${esc(u.phone)}</td>`
+    + `<td>${esc(u.coach || u.pro_code || '—')}</td><td>${esc(u.joined)}</td><td>${u.meals_7d}</td><td${u.pending ? ' class="warn"' : ''}>${u.pending}</td><td>${esc(u.last || '—')}</td></tr>`).join('')
+    || '<tr><td colspan="8" class="muted">Пока никого.</td></tr>';
+  if (!o) { $('kpis').innerHTML = '<p class="muted">Сводка сейчас не загрузилась — подробности в логах сервера. Коды входа работают.</p>'; return; }
   const r = o.roles, pct = (x) => x.cohort ? Math.round(100 * (x.kept || 0) / x.cohort) + '%' : '—';
   const kpi = [
     ['клиентов', fmt(r.client || 0)], ['специалистов', fmt((r.trainer || 0) + (r.nutritionist || 0))], ['операторов', fmt(r.operator || 0)],
@@ -116,9 +123,6 @@ async function load() {
   $('kpis').innerHTML = kpi.map(([l, v]) => `<div class="card"><div class="num">${esc(v)}</div><div class="muted">${esc(l)}</div></div>`).join('');
   const max = Math.max(1, ...o.photos_by_day.map((d) => d.photos));
   $('bars').innerHTML = o.photos_by_day.map((d) => `<div title="${esc(d.date)}: ${d.photos} фото, ${d.users} чел." style="height:${Math.max(2, 100 * d.photos / max)}%"><span>${Number(d.date.slice(8))}</span></div>`).join('');
-  $('users').innerHTML = users.map((u) => `<tr><td>${u.user_id}</td><td><span class="pill">${esc(ROLES[u.role] || u.role)}</span></td><td>${esc(u.phone)}</td>`
-    + `<td>${esc(u.coach || u.pro_code || '—')}</td><td>${esc(u.joined)}</td><td>${u.meals_7d}</td><td${u.pending ? ' class="warn"' : ''}>${u.pending}</td><td>${esc(u.last || '—')}</td></tr>`).join('')
-    || '<tr><td colspan="8" class="muted">Пока никого.</td></tr>';
   $('missing').textContent = o.missing_dishes.length ? o.missing_dishes.map(([n, c]) => `${n} (${c})`).join(', ') : 'Всё распознанное есть в базе.';
 }
 

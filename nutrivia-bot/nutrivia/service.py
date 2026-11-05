@@ -2,8 +2,9 @@
 Telegram-слой (bot.py) только переводит сообщения и кнопки в вызовы этих методов."""
 import hashlib
 import json
+import logging
 import secrets
-from collections import Counter
+from collections import Counter, defaultdict
 from dataclasses import dataclass
 from datetime import datetime
 from pathlib import Path
@@ -16,6 +17,8 @@ from .engine import DishBase, compute
 from .matcher import Matcher, parse_edits
 from .texts import GOALS, HEALTH_WORDS, HOME_PRODUCTS
 from .vision import VisionProvider, VisionResult, parse_payload
+
+log = logging.getLogger(__name__)
 
 
 @dataclass
@@ -1007,8 +1010,12 @@ class Service:
         d1, d7 = await retained(1), await retained(7)
         pending = await self.db.fetchone(
             "SELECT COUNT(*) AS n, MIN(received_at) AS oldest FROM meals WHERE status = 'draft'")
-        metrics = await compute_metrics(self.db)
-        m = metrics["summary"]
+        try:
+            metrics = await compute_metrics(self.db)
+        except Exception:  # метрики — не повод ронять админку: без неё не выдать код входа
+            log.exception("compute_metrics failed")
+            metrics = {"summary": {}, "missing_dishes": []}
+        m = defaultdict(lambda: None, metrics["summary"])
         return {
             "roles": roles, "photos_by_day": days,
             "retention": {"d1": dict(d1), "d7": dict(d7)},
