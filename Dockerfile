@@ -26,4 +26,5 @@ EXPOSE 8000
 # TRUST_PROXY=1 — образ работает за прокси Railway: адрес клиента и https берём из его заголовков.
 # DEMO_SEED=1 — при старте один раз создать демо-аккаунты (если их ещё нет);
 # DEMO_SEED=reset — пересоздавать их при каждом старте: неделя заканчивается сегодняшним днём.
-CMD ["sh", "-c", "mkdir -p /data && case \"$DEMO_SEED\" in reset) python -m scripts.demo_seed --reset || true;; ?*) python -m scripts.demo_seed || true;; esac; exec python -m nutrivia.api"]
+# timeout — что бы ни случилось с демо-скриптом, сервер всё равно стартует.
+CMD ["sh", "-c", "mkdir -p /data && case \"$DEMO_SEED\" in reset) timeout 300 python -m scripts.demo_seed --reset || true;; ?*) timeout 300 python -m scripts.demo_seed || true;; esac; exec python -m nutrivia.api"]

@@ -76,7 +76,11 @@ async def main(reset: bool) -> None:
         if uid is None:
             continue
         if not reset:
-            sys.exit(f"{raw} уже есть в {cfg.db_path}. Запустите с --reset, чтобы пересоздать демо-аккаунты.")
+            # базу закрываем обязательно: открытое соединение aiosqlite не даёт процессу завершиться,
+            # и в Docker сервер после этого скрипта так и не стартует
+            print(f"{raw} уже есть в {cfg.db_path} — демо-аккаунты не трогаю (пересоздать: --reset).")
+            await db.conn.close()
+            return
         # как «Удалить аккаунт» в приложении: сначала входы — иначе новый аккаунт с тем же id унаследует чужую сессию
         await auth.forget_user(uid)
         await svc.delete_user(uid)
