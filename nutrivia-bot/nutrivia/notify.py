@@ -8,6 +8,10 @@
 - 11:00 — фото ещё нет: напомнить про завтрак;
 - 16:00 — «Совет на вечер»: остаток до ориентира и блюда из базы (их подбирает Engine, не модель);
 - 20:00 — день ещё не засчитан в серию: сколько фото осталось, чтобы стадия голубики не опустилась.
+
+Тренеру и нутрициологу (привязка из кабинета):
+- «Новое фото от ученика ждёт проверки» — сразу после фото, с кнопкой на экран проверки;
+операторам Nutrivia — фото клиентов без тренера сразу, а разборы учеников, которые ждут дольше 15 минут, — раз на разбор.
 """
 import logging
 import secrets
@@ -79,6 +83,63 @@ async def review_done(svc, meal_id: int, send: Send) -> bool:
     if view.get("comment"):
         text += f"\n\n💬 {view['comment']}"
     return await send(chat, text, f"/meal?id={meal_id}")
+
+
+async def _reviewers(svc, student) -> list[tuple[int, int]]:
+    """Кому из привязавших Telegram показывать разбор этого клиента: [(user_id, chat_id)]."""
+    if student["coach_code"]:
+        rows = await svc.db.fetchall(
+            "SELECT l.user_id, l.chat_id FROM tg_links l JOIN pros p ON p.user_id = l.user_id WHERE p.code = ?",
+            (student["coach_code"],))
+    else:
+        rows = await _operators(svc)
+    return [(r["user_id"], r["chat_id"]) for r in rows]
+
+
+async def _operators(svc):
+    return await svc.db.fetchall(
+        "SELECT l.user_id, l.chat_id FROM tg_links l JOIN users u ON u.tg_id = l.user_id WHERE u.role = 'operator'")
+
+
+async def _review_notice(svc, pro_id: int, meal_id: int, lead: str) -> str | None:
+    view = await svc.pro_meal_view(pro_id, meal_id)
+    if view is None:
+        return None
+    names = ", ".join(i["name"] for i in view["items"][:4]).lower().capitalize() or "блюда не распознаны"
+    return f"{lead} {view['student']}: {names} — {_kcal(view['items'])} ккал (оценка по фото).\nПроверьте и отправьте."
+
+
+async def new_photo(svc, meal_id: int, send: Send) -> int:
+    """Новое фото клиента → его тренеру/нутрициологу (или операторам, если тренера нет). Возвращает, скольким ушло."""
+    meal = await svc.db.fetchone("SELECT user_id, status FROM meals WHERE id = ?", (meal_id,))
+    if meal is None or meal["status"] != "draft":
+        return 0
+    student = await svc.db.get_user(meal["user_id"])
+    sent = 0
+    for pro_id, chat in await _reviewers(svc, student):
+        text = await _review_notice(svc, pro_id, meal_id, "📸 Новое фото на проверку —")
+        if text and await svc.db.job_once(f"tg:photo:{meal_id}:{pro_id}"):
+            sent += await send(chat, text, f"/pro-review?id={meal_id}")
+    return sent
+
+
+async def due_late_reviews(svc, ts: int | None = None) -> list[tuple[int, str, str]]:
+    """Разборы учеников тренера, которые ждут дольше 15 минут, → операторам (раз на разбор)."""
+    ts = ts or svc.db.clock()
+    ops = await _operators(svc)
+    if not ops:
+        return []
+    rows = await svc.db.fetchall(
+        "SELECT m.id FROM meals m JOIN users u ON u.tg_id = m.user_id WHERE m.status = 'draft' AND u.channel = 'app'"
+        " AND u.role = 'client' AND u.coach_code IS NOT NULL AND m.received_at < ? AND m.received_at >= ?",
+        (ts - svc.OPERATOR_AFTER, ts - 6 * 3600))  # старше 6 часов — уже не «срочно», не будим
+    out = []
+    for r in rows:
+        for op_id, chat in ops:
+            text = await _review_notice(svc, op_id, r["id"], "⏰ Ждёт дольше 15 минут —")
+            if text and await svc.db.job_once(f"tg:late:{r['id']}:{op_id}"):
+                out.append((chat, text, f"/pro-review?id={r['id']}"))
+    return out
 
 
 async def due_reminders(svc, ts: int | None = None) -> list[tuple[int, str, str]]:

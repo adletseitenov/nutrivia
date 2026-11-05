@@ -50,7 +50,8 @@ def proxy_user_id(chat_id: int, label: str) -> int:
 async def send_review_card(bot: Bot, svc: Service, chat_id: int, meal_id: int, image: bytes, text: str) -> None:
     """Карточка черновика в группу проверки. Её же шлёт API для фото из приложения."""
     if not chat_id:
-        log.error("no review chat for meal %s — задайте SOLO_REVIEW_CHAT_ID", meal_id)
+        # группы проверки нет — это нормально: специалист видит разбор в кабинете и получает его в личку бота
+        log.info("meal %s: группа проверки не задана (SOLO_REVIEW_CHAT_ID), карточку в группу не шлём", meal_id)
         return
     caption = text if len(text) <= CAPTION_LIMIT else text[:CAPTION_LIMIT - 1] + "…"
     msg = await bot.send_photo(chat_id, BufferedInputFile(image, f"meal{meal_id}.jpg"),
@@ -104,7 +105,10 @@ def build(cfg: Config, svc: Service) -> tuple[Router, Router]:
                  "app-link" if (command.args or "").startswith(LINK_PREFIX) else (command.args or "none"))
         if (command.args or "").startswith(LINK_PREFIX):  # привязка из профиля приложения
             uid = await consume_link(svc.db, command.args, msg.chat.id)
+            role = (await svc.db.get_user(uid))["role"] if uid else None
             await msg.answer(
+                "Готово! Сюда будут приходить новые фото учеников на проверку — с кнопкой, чтобы сразу открыть "
+                "разбор. Отключить — в кабинете приложения." if role in ("trainer", "nutritionist", "operator") else
                 "Готово! Сюда будут приходить уведомления Nutrivia: проверенные разборы, совет на вечер "
                 "и напоминания о серии. Отключить — в профиле приложения." if uid else
                 "Ссылка устарела. Откройте профиль в приложении и нажмите «Подключить Telegram» ещё раз.")

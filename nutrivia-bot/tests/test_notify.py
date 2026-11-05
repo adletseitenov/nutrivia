@@ -5,7 +5,8 @@ import pytest
 
 from nutrivia.config import ALMATY, Config
 from nutrivia.db import Database
-from nutrivia.notify import LINK_TTL, chat_for, consume_link, due_reminders, new_link_token, review_done, unlink
+from nutrivia.notify import (LINK_TTL, chat_for, consume_link, due_late_reviews, due_reminders, new_link_token, new_photo,
+                             review_done, unlink)
 from nutrivia.service import Service
 from nutrivia.vision import FakeVision
 
@@ -110,3 +111,45 @@ async def test_reminders_skip_trainers(svc):
     await consume_link(svc.db, "app_" + await new_link_token(svc.db, trainer), 900)
     svc.db.clock = lambda: at(11, 5)
     assert await due_reminders(svc, at(11, 5)) == []
+
+
+async def link(svc, user, chat):
+    await consume_link(svc.db, "app_" + await new_link_token(svc.db, user), chat)
+
+
+async def test_new_photo_goes_to_own_trainer_once(svc):
+    client, trainer = await client_and_trainer(svc)
+    other = (await svc.create_app_user("trainer", "ru", None, "Чужой"))["tg_id"]
+    await link(svc, other, 777)
+    svc.db.clock = lambda: at(13)
+    out = await svc.receive_photo(client, b"img", ts=at(13))
+    box = Outbox()
+    assert await new_photo(svc, out.meal_id, box) == 0                 # свой тренер не привязан, чужому — нельзя
+    await link(svc, trainer, 900)
+    assert await new_photo(svc, out.meal_id, box) == 1
+    assert await new_photo(svc, out.meal_id, box) == 0                 # повтор не шлём
+    chat, text, path = box.sent[0]
+    assert chat == 900 and path == f"/pro-review?id={out.meal_id}"
+    assert "Ученик 1" in text and "Плов" in text and "оценка по фото" in text
+    assert await svc.pro_send(trainer, out.meal_id) == "ok"
+    assert await new_photo(svc, out.meal_id, Outbox()) == 0            # уже проверен
+
+
+async def test_operators_get_clients_without_coach_and_late_reviews(svc):
+    client, trainer = await client_and_trainer(svc)
+    solo = (await svc.create_app_user("client", "ru", "even", None))["tg_id"]
+    op = (await svc.create_app_user("client", "ru", None, None))["tg_id"]
+    await svc.db.update_user(op, role="operator")
+    await link(svc, op, 300)
+    svc.db.clock = lambda: at(13)
+    box = Outbox()
+    own = await svc.receive_photo(solo, b"a", ts=at(13))
+    assert await new_photo(svc, own.meal_id, box) == 1 and box.sent[0][0] == 300 and "Клиент" in box.sent[0][1]
+    coached = await svc.receive_photo(client, b"b", ts=at(13))
+    assert await new_photo(svc, coached.meal_id, box) == 0             # ученик тренера — сначала тренеру
+    assert await due_late_reviews(svc, at(13, 10)) == []               # ещё не 15 минут
+    svc.db.clock = lambda: at(13, 20)
+    late = await due_late_reviews(svc, at(13, 20))
+    assert len(late) == 1 and late[0][0] == 300 and late[0][2] == f"/pro-review?id={coached.meal_id}"
+    assert "дольше 15 минут" in late[0][1]
+    assert await due_late_reviews(svc, at(13, 30)) == []               # раз на разбор

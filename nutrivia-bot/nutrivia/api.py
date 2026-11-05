@@ -105,13 +105,22 @@ class Notifier:
         except Exception:
             log.exception("review notice for meal %s failed", meal_id)
 
+    async def new_photo(self, meal_id: int) -> None:
+        if self.bot is None:
+            return
+        from .notify import new_photo
+        try:
+            await new_photo(self.svc, meal_id, self.sender())
+        except Exception:
+            log.exception("new photo notice for meal %s failed", meal_id)
+
     async def _reminders(self) -> None:
         import asyncio
-        from .notify import due_reminders
+        from .notify import due_late_reviews, due_reminders
         send = self.sender()
         while True:
             try:
-                for chat_id, text, path in await due_reminders(self.svc):
+                for chat_id, text, path in await due_reminders(self.svc) + await due_late_reviews(self.svc):
                     await send(chat_id, text, path)
             except Exception:
                 log.exception("telegram reminders tick failed")
@@ -484,6 +493,7 @@ def create_app(cfg: Config | None = None, vision: VisionProvider | None = None, 
         if out.status != "draft":
             raise HTTPException(403, out.status)
         background.add_task(app.state.notifier.review_card, out.review_chat_id, out.meal_id, data, out.review_text)
+        background.add_task(app.state.notifier.new_photo, out.meal_id)
         view = await svc.meal_view(out.meal_id, user["tg_id"])
         return {**view, "night": out.night}
 

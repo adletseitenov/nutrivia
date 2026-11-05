@@ -3,7 +3,7 @@ import { useCallback, useState } from 'react';
 import { ActivityIndicator, Pressable, Share, StyleSheet, View } from 'react-native';
 
 import {
-  ApiError, getModeration, getQueue, getStudents, logout, moderatePost, type Me, type Post, type ProMeal, type Student,
+  ApiError, getMe, getModeration, getQueue, getStudents, logout, moderatePost, type Me, type Post, type ProMeal, type Student,
 } from '@/api/client';
 import { Button } from '@/components/button';
 import { MealCard } from '@/components/meal-card';
@@ -16,6 +16,7 @@ import { itemsFromServer, mealNutrients, useAppStore } from '@/store/app-store';
 import { font, radius, space } from '@/theme/tokens';
 import { useColors } from '@/theme/use-colors';
 import { t } from '@/lib/i18n';
+import { useTelegram } from '@/lib/use-telegram';
 
 /**
  * Кабинет тренера, нутрициолога или оператора Nutrivia: очередь разборов на проверку и клиенты за сегодня.
@@ -56,6 +57,10 @@ export default function Pro() {
   );
 
   const pro = data?.me.pro;
+  const telegram = data?.me.telegram;
+  const setMe = useCallback((me: Me) => setData((d) => (d ? { ...d, me } : d)), []);
+  const refreshMe = useCallback(() => getMe().then(setMe, () => {}), [setMe]);
+  const onTelegram = useTelegram(telegram, setMe, refreshMe);
   const isTrainer = data?.me.role === 'trainer';
   const isOperator = !!pro?.operator;
 
@@ -184,6 +189,25 @@ export default function Pro() {
             ))}
           </View>
         </>
+      )}
+
+      {telegram?.available && (
+        <Pressable
+          accessibilityRole="button"
+          onPress={onTelegram}
+          style={[styles.student, styles.row, { backgroundColor: c.surface }]}>
+          <View style={{ flex: 1, gap: 2 }}>
+            <Txt variant="body" style={{ fontFamily: font.semibold }}>{t('Новые фото в Telegram')}</Txt>
+            <Txt variant="caption" tone="muted">
+              {telegram.linked
+                ? t('Подключено — каждое новое фото придёт сообщением с кнопкой «Открыть».')
+                : t('Сообщение о каждом новом фото на проверку — чтобы не держать кабинет открытым.')}
+            </Txt>
+          </View>
+          <Txt variant="caption" style={{ color: telegram.linked ? c.muted : c.accent, fontFamily: font.semibold }}>
+            {telegram.linked ? t('Отключить') : t('Подключить')}
+          </Txt>
+        </Pressable>
       )}
 
       <Txt variant="caption" tone="muted">
