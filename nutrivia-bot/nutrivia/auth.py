@@ -5,7 +5,8 @@
 - Сессия: случайный токен 32 байта, в базе только его SHA-256, срок 90 дней.
 - Отправка SMS — через SmsProvider: MobizonSms (Казахстан) или ConsoleSms (код в лог сервера, только для разработки).
 - ManualCodes (пилот без SMS): код заранее выдаёт админ (scripts/pilot_code.py) и пересылает человеку сам.
-  Живёт 7 дней, одноразовый; номер без выданного кода войти не может.
+  Живёт 7 дней, им можно входить повторно (Safari, потом иконка «Домой»; после выхода);
+  номер без выданного кода войти не может. Код из SMS — одноразовый.
 """
 import hashlib
 import hmac
@@ -195,7 +196,8 @@ class SmsAuth:
         return phone, code
 
     async def verify(self, raw_phone: str, code: str) -> str:
-        """Проверяет код. Возвращает нормализованный номер; одноразовый код после успеха удаляется."""
+        """Проверяет код. Возвращает нормализованный номер. Код из SMS после успеха удаляется,
+        код от админа (hour_sends = 0) остаётся до конца срока — счётчик ошибок обнуляется."""
         phone = normalize_phone(raw_phone)
         now = self.db.clock()
         row = await self.db.fetchone("SELECT * FROM sms_codes WHERE phone = ?", (phone,))
@@ -208,7 +210,10 @@ class SmsAuth:
             left = MAX_ATTEMPTS - row["attempts"] - 1
             raise AuthError("wrong_code", f"Неверный код. Осталось попыток: {left}." if left else
                             "Неверный код. Запросите новый.", 400)
-        await self.db.execute("DELETE FROM sms_codes WHERE phone = ?", (phone,))
+        if row["hour_sends"] == 0:
+            await self.db.execute("UPDATE sms_codes SET attempts = 0 WHERE phone = ?", (phone,))
+        else:
+            await self.db.execute("DELETE FROM sms_codes WHERE phone = ?", (phone,))
         return phone
 
     async def user_for_phone(self, phone: str) -> int | None:

@@ -721,7 +721,7 @@ def create_app(cfg: Config | None = None, vision: VisionProvider | None = None, 
         text = (f"Привет! Это Nutrivia — фото еды → калории и разбор от нутрициолога.\n"
                 f"1. Открой ссылку в Safari или Chrome на телефоне: {link}\n"
                 f"2. Чтобы было как приложение: «Поделиться» → «На экран Домой».\n"
-                f"3. Введи свой номер и код входа: {code}\nКод одноразовый, действует 7 дней.")
+                f"3. Введи свой номер и код входа: {code}\nКод действует 7 дней — им можно войти снова, например с иконки на экране «Домой».")
         return {"phone": phone, "code": code, "message": text}
 
     @app.post("/v1/admin/operators", dependencies=[Admin])

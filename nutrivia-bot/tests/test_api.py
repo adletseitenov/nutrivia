@@ -436,9 +436,12 @@ def test_manual_codes_only_for_invited(manual_client):
         assert c.post("/v1/auth/sms/verify", json={**body, "code": old}).status_code == 400
     r = c.post("/v1/auth/sms/verify", json={**body, "code": code})
     assert r.status_code == 200, r.text
-    # Одноразовый: второй вход тем же кодом не пускает
-    assert c.post("/v1/auth/sms/start", json={"phone": PHONE}).status_code == 403
-    assert c.post("/v1/auth/sms/verify", json={**body, "code": code}).status_code == 400
+    # Код от админа работает весь срок: вошёл в Safari, потом с иконки «Домой» — тем же кодом
+    assert c.post("/v1/auth/sms/start", json={"phone": PHONE}).status_code == 200
+    again = c.post("/v1/auth/sms/verify", json={**body, "code": code})
+    assert again.status_code == 200 and again.json()["is_new"] is False      # тот же аккаунт, не новый
+    me = c.get("/v1/me", headers={"Authorization": f"Bearer {again.json()['token']}"}).json()
+    assert me["user_id"] == c.get("/v1/me", headers={"Authorization": f"Bearer {r.json()['token']}"}).json()["user_id"]
 
 
 def test_sms_start_reports_delivery(client):
