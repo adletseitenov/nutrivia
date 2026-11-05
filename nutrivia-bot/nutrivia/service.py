@@ -1010,10 +1010,14 @@ class Service:
         d1, d7 = await retained(1), await retained(7)
         pending = await self.db.fetchone(
             "SELECT COUNT(*) AS n, MIN(received_at) AS oldest FROM meals WHERE status = 'draft'")
+        metrics_error = None
         try:
             metrics = await compute_metrics(self.db)
-        except Exception:  # метрики — не повод ронять админку: без неё не выдать код входа
+        except Exception as e:  # метрики — не повод ронять админку: без неё не выдать код входа
             log.exception("compute_metrics failed")
+            import traceback
+            metrics_error = f"{type(e).__name__}: {e} @ " + " < ".join(
+                f"{f.name}:{f.lineno}" for f in reversed(traceback.extract_tb(e.__traceback__)))
             metrics = {"summary": {}, "missing_dishes": []}
         m = defaultdict(lambda: None, metrics["summary"])
         return {
@@ -1024,6 +1028,7 @@ class Service:
             "review_median_s": m["median_review_seconds"], "gram_error_median": m["gram_error_median"],
             "ai": {"requests": m["ai_requests"], "failed": m["ai_failed"], "cost_usd": m["ai_cost_usd"]},
             "missing_dishes": metrics["missing_dishes"][:15],
+            "metrics_error": metrics_error,
         }
 
     async def admin_users(self, phones: dict[int, str]) -> list[dict]:
